@@ -1,0 +1,401 @@
+/* Custom styles for SIWASTA Desktop with Teal Theme */
+
+:root {
+  --primary: #1a8e83;
+  --primary-dark: #0e6b62;
+  --secondary: #34a853;
+  --accent: #00bcd4;
+  --light: #f8f9fa;
+  --dark: #2c3e50;
+  --danger: #ea4335;
+  --warning: #fbbc05;
+  --success: #34a853;
+  --info: #4285f4;
+  --gray: #6c757d;
+  --teal: #1a8e83;
+  --teal-light: #e0f2f1;
+  --teal-dark: #00695c;
+}
+
+body {
+  font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f0f4f8;
+  color: #333;
+}
+
+/* Header & Navigation */
+.navbar {
+  background-color: var(--teal);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 0.7rem 1rem;
+}
+
+.navbar-brand {
+  font-weight: 600;
+  font-size: 1.4rem;
+  color: white !important;
+  display: flex;
+  align-items: center;
+}
+
+.navbar-brand i {
+  margin-right: 10px;
+  font-size: 1.8rem;
+}
+
+.navbar-dark .navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.navbar-dark .navbar-nav .nav-link.active {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Cards */
+.card {
+  border: none;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+  margin-bottom: 25px;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.card-header {
+  background-color: var(--teal);
+  color: white;
+  font-weight: 600;
+  border: none;
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  border-radius: 10px 10px 0 0 !important;
+}
+
+.card-header i {
+  margin-right: 10px;
+  font-size: 1.2rem;
+}
+
+.card-body {
+  padding: 20px;
+}
+
+/* Buttons */
+.btn {
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: var(--teal);
+  border-color: var(--teal);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--teal-dark);
+  border-color: var(--teal-dark);
+  box-shadow: 0 5px 15px rgba(26, 142, 131, 0.3);
+}
+
+.btn-success {
+  background-color: var(--success);
+  border-color: var(--success);
+}
+
+.btn-success:hover, .btn-success:focus {
+  background-color: #2d9249;
+  border-color: #2d9249;
+  box-shadow: 0 5px 15px rgba(52, 168, 83, 0.3);
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-weight: 600;
+}
+
+.btn-xxl {
+  padding: 16px 32px;
+  font-weight: 700;
+  font-size: 1.25rem;
+  border-radius: 10px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* Run SIMRS Button Styles */
+.run-simrs-container {
+  margin: 30px auto;
+  max-width: 500px;
+}
+
+.action-highlight-box {
+  background-color: rgba(224, 242, 241, 0.7);
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+  border: 2px dashed rgba(26, 142, 131, 0.3);
+  position: relative;
+}
+
+.action-highlight-box:before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 15px solid rgba(224, 242, 241, 0.7);
+}
+
+.run-simrs-btn {
+  display: block;
+  width: 100%;
+  transition: all 0.3s ease;
+  background-color: #28a745;
+  border-color: #28a745;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  letter-spacing: 0.5px;
+}
+
+.run-simrs-btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: all 0.6s;
+  z-index: -1;
+}
+
+.run-simrs-btn:hover:before {
+  left: 100%;
+}
+
+.run-simrs-btn:hover, .run-simrs-btn:focus {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(40, 167, 69, 0.5);
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+/* Animations */
+.content-section {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pulse-highlight {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px 10px rgba(52, 168, 83, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(52, 168, 83, 0.7);
+  }
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+.pulse-highlight {
+  animation: pulse-highlight 2s infinite;
+}
+
+/* Custom styles for tables */
+.table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.table th {
+  background-color: var(--teal-light);
+  font-weight: 600;
+  color: var(--teal-dark);
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(26, 142, 131, 0.05);
+}
+
+/* Custom styles for form elements */
+.form-control, .form-select {
+  border-radius: 5px;
+  padding: 12px;
+  border: 1px solid #ced4da;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 0.2rem rgba(26, 142, 131, 0.25);
+}
+
+.input-group-text {
+  background-color: var(--teal-light);
+  border: 1px solid #ced4da;
+  color: var(--teal-dark);
+}
+
+/* Custom styles for badges */
+.badge {
+  padding: 5px 10px;
+  font-weight: 500;
+  border-radius: 20px;
+}
+
+/* Custom styles for alerts */
+.alert {
+  padding: 15px;
+  margin-bottom: 20px;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+.alert-dismissible .btn-close {
+  padding: 15px;
+}
+
+/* Custom styles for cards on dashboard */
+.dashboard-card {
+  transition: all 0.3s ease;
+  border-radius: 10px;
+  overflow: hidden;
+  height: 100%;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card .card-body {
+  padding: 25px;
+}
+
+.dashboard-card .icon {
+  font-size: 2.5rem;
+  margin-bottom: 15px;
+  color: var(--teal);
+}
+
+/* Welcome Card Styles */
+.welcome-card {
+  border-left: 5px solid var(--teal);
+  transition: all 0.3s ease;
+}
+
+.welcome-card:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Login page specific styles */
+.login-card {
+  max-width: 450px;
+  margin: 50px auto;
+}
+
+.login-logo {
+  max-width: 120px;
+  margin-bottom: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .btn-lg {
+    padding: 10px 16px;
+  }
+
+  .card-body {
+    padding: 15px;
+  }
+
+  .dashboard-card .card-body {
+    padding: 20px;
+  }
+}
+
+/* Fix for button elements styled as nav-links and dropdown-items */
+.nav-link.btn.btn-link {
+  border: none;
+  background: none;
+  text-align: left;
+  padding: 0.5rem 1rem;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  transition: color 0.15s ease-in-out;
+}
+
+.nav-link.btn.btn-link:hover,
+.nav-link.btn.btn-link:focus {
+  color: rgba(255, 255, 255, 1);
+  background: none;
+  border: none;
+  text-decoration: none;
+}
+
+.dropdown-item.btn.btn-link {
+  border: none;
+  background: none;
+  text-align: left;
+  width: 100%;
+  padding: 0.25rem 1rem;
+  color: #212529;
+  text-decoration: none;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.dropdown-item.btn.btn-link:hover,
+.dropdown-item.btn.btn-link:focus {
+  background-color: #e9ecef;
+  color: #16181b;
+  border: none;
+  text-decoration: none;
+}

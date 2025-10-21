@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Konfigurasi Sistem Shift</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .admin-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+        }
+        .unit-card {
+            transition: all 0.3s ease;
+            border: 1px solid #e0e0e0;
+        }
+        .unit-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .shift-enabled {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .shift-disabled {
+            background-color: #f8f9fa;
+            border-color: #dee2e6;
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .path-input {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1 class="mb-0">
+                        <i class="bi bi-gear-fill me-2"></i>
+                        Admin Panel - Konfigurasi Sistem Shift
+                    </h1>
+                    <p class="mb-0 mt-2 opacity-75">Kelola pengaturan sistem shift untuk setiap unit kerja</p>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-light" onclick="goBack()">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        Kembali
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mt-4">
+        <!-- Alert untuk feedback -->
+        <div id="admin-alert" class="alert alert-dismissible fade" role="alert" style="display: none;">
+            <span id="admin-alert-message"></span>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+
+        <!-- Filter dan Search -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="search-unit" placeholder="Cari unit kerja...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filter-status">
+                    <option value="">Semua Status</option>
+                    <option value="enabled">Shift Aktif</option>
+                    <option value="disabled">Shift Nonaktif</option>
+                    <option value="uses-shift">Menggunakan Shift</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-success w-100" onclick="saveAllChanges()">
+                    <i class="bi bi-check-circle me-1"></i>
+                    Simpan Semua Perubahan
+                </button>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-title">Total Unit</h6>
+                                <h3 id="total-units">0</h3>
+                            </div>
+                            <i class="bi bi-building fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-title">Shift Aktif</h6>
+                                <h3 id="active-shifts">0</h3>
+                            </div>
+                            <i class="bi bi-clock fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-title">Menggunakan Shift</h6>
+                                <h3 id="uses-shift">0</h3>
+                            </div>
+                            <i class="bi bi-toggle-on fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="card-title">Tanpa Shift</h6>
+                                <h3 id="no-shift">0</h3>
+                            </div>
+                            <i class="bi bi-toggle-off fs-1 opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unit Kerja Cards -->
+        <div id="units-container" class="row">
+            <!-- Unit cards will be loaded here -->
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Memuat data unit kerja...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../renderer/admin.js"></script>
+</body>
+</html>

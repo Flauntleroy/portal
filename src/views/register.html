@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIWASTA - Registrasi</title>
+  <link rel="stylesheet" href="../../node_modules/bootstrap/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-light">
+  <div class="container">
+    <div class="row justify-content-center mt-5">
+      <div class="col-md-8">
+        <div class="card shadow">
+          <div class="card-header bg-primary text-white text-center">
+            <h4><i class="fas fa-user-plus"></i> Registrasi Pengguna Baru</h4>
+          </div>
+          <div class="card-body">
+            <div class="text-center mb-4">
+              <img src="../assets/img/logo.png" alt="SIWASTA Logo" class="img-fluid mb-3" style="max-width: 150px;">
+              <h5>Sistem Informasi Manajemen Rumah Sakit</h5>
+              <p class="text-muted">Silakan isi form di bawah untuk mendaftar</p>
+            </div>
+            
+            <div id="alert-container"></div>
+            
+            <form id="register-form">
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label for="username" class="form-label">Username</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                    <input type="text" class="form-control" id="username" name="username" required>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="email" class="form-label">Email</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                    <input type="email" class="form-control" id="email" name="email" required>
+                  </div>
+                </div>
+              </div>
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label for="password" class="form-label">Password</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="confirm-password" class="form-label">Konfirmasi Password</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                    <input type="password" class="form-control" id="confirm-password" required>
+                  </div>
+                </div>
+              </div>
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label for="full-name" class="form-label">Nama Lengkap</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-id-card"></i></span>
+                    <input type="text" class="form-control" id="full-name" name="full_name" required>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label for="contact" class="form-label">Kontak (Opsional)</label>
+                  <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                    <input type="text" class="form-control" id="contact" name="contact">
+                  </div>
+                </div>
+              </div>
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label for="unit-kerja" class="form-label">Unit Kerja</label>
+                  <select class="form-select" id="unit-kerja" name="unit_kerja_id">
+                    <option value="">Pilih Unit Kerja</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label for="simrs-path" class="form-label">Path SIMRS (Opsional)</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control" id="simrs-path" name="simrs_path">
+                    <button class="btn btn-outline-secondary" type="button" id="browse-simrs-path">Browse</button>
+                  </div>
+                </div>
+              </div>
+              <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary btn-block">
+                  <i class="fas fa-user-plus"></i> Daftar
+                </button>
+                <a href="login.html" class="btn btn-outline-secondary btn-block">
+                  <i class="fas fa-arrow-left"></i> Kembali ke Login
+                </a>
+              </div>
+            </form>
+          </div>
+          <div class="card-footer text-center">
+            <p class="mb-0">SIWASTA Desktop v1.0.0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../renderer/register.js"></script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal SIMRS</title>
+  <link rel="stylesheet" href="../../node_modules/bootstrap/dist/css/bootstrap.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">
+        <i class="fas fa-hospital"></i> Portal SIMRS
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+          <li class="nav-item">
+            <a class="nav-link active" href="#" id="nav-dashboard">
+              <i class="fas fa-tachometer-alt me-1"></i> Dashboard
+            </a>
+          </li>
+          <li class="nav-item">
+            <button type="button" class="nav-link btn btn-link" id="nav-profile">
+              <i class="fas fa-user-circle me-1"></i> Profil
+            </button>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="admin.html" id="nav-admin">
+              <i class="fas fa-cogs me-1"></i> Admin
+            </a>
+          </li>
+          <li class="nav-item">
+            <button type="button" class="nav-link btn btn-link" id="logout-nav-btn">
+              <i class="fas fa-sign-out-alt me-1"></i> Logout
+            </button>
+          </li>
+        </ul>
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+              <div class="d-flex align-items-center">
+                <div class="rounded-circle overflow-hidden me-2" style="width: 30px; height: 30px;">
+                  <img id="nav-profile-photo" src="../assets/img/default-user.png" alt="Foto Profil" class="img-fluid w-100 h-100 object-fit-cover d-none">
+                  <i id="nav-profile-placeholder" class="fas fa-user" style="font-size: 1.2rem; color: white;"></i>
+                </div>
+                <span id="username-display">User</span>
+              </div>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><button type="button" class="dropdown-item btn btn-link" id="nav-profile-dropdown"><i class="fas fa-id-card me-2"></i> Profil</button></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><button type="button" class="dropdown-item btn btn-link" id="logout-btn"><i class="fas fa-sign-out-alt me-2"></i> Logout</button></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container mt-4">
+    <!-- Dashboard Content -->
+    <div id="dashboard-content" class="content-section">
+      <!-- Welcome Header - More Compact -->
+      <div class="row mb-3">
+        <div class="col-md-12">
+          <div class="card welcome-card">
+            <div class="card-body py-3 px-4">
+              <div class="d-flex align-items-center">
+                <div class="me-3">
+                  <div id="dashboard-photo-container" class="rounded-circle bg-teal-light p-2 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; overflow: hidden;">
+                    <img id="dashboard-photo" src="../assets/img/default-user.png" alt="Foto Profil" class="img-fluid w-100 h-100 object-fit-cover d-none">
+                    <i id="dashboard-photo-placeholder" class="fas fa-user-circle" style="font-size: 2rem; color: var(--teal);"></i>
+                  </div>
+                </div>
+                <div>
+                  <h3 class="fw-bold mb-0" style="color: var(--teal-dark);">Selamat Datang, <span id="fullname-display">User</span>!</h3>
+                  <p class="text-muted mb-0 small">Anda telah berhasil login ke Portal SIMRS RSUD H. Abdul Aziz Marabahan.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SIMRS Content -->
+      <div class="row">
+        <div class="col-lg-10 mx-auto">
+          <!-- Main Action Button - Prominent Position -->
+          <div class="text-center mb-5">
+            <div id="unit-kerja-info" class="mb-3 fw-semibold" style="color: var(--teal);"></div>
+            
+            <!-- Shift Status Indicator -->
+            <div id="shift-status-indicator" class="mb-3" style="display: none;">
+              <div class="card border-0 shadow-sm">
+                <div class="card-body py-2 px-3">
+                  <div class="d-flex align-items-center justify-content-center">
+                    <div class="me-2">
+                      <i id="shift-icon" class="fas fa-sun text-warning"></i>
+                    </div>
+                    <div class="text-center">
+                      <small class="text-muted d-block mb-0">Shift Aktif</small>
+                      <span id="current-shift-name" class="fw-bold" style="color: var(--teal-dark);">Shift Pagi</span>
+                      <small id="shift-time-info" class="text-muted d-block">08:00 - 16:30</small>
+                    </div>
+                    <div class="ms-2">
+                      <button id="manual-shift-change-btn" class="btn btn-sm btn-outline-primary" title="Ganti Shift Manual">
+                        <i class="fas fa-exchange-alt"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="run-simrs-container">
+              <div class="action-highlight-box">
+                <h4 class="text-center mb-3" style="color: var(--teal-dark);">Klik tombol di bawah untuk menjalankan aplikasi SIMRS</h4>
+                <button type="button" id="run-simrs-btn" class="btn btn-xxl btn-success px-5 py-4 run-simrs-btn pulse-highlight">
+                  <i class="fas fa-play-circle me-2" style="font-size: 2rem;"></i>
+                  <span style="font-size: 1.5rem; font-weight: 700;">Jalankan SIMRS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="simrs-alert-container"></div>
+
+          <div id="simrs-status" class="d-none alert alert-success mt-4" style="background-color: rgba(52, 168, 83, 0.1); border: none; border-left: 4px solid var(--success);">
+            <div class="d-flex align-items-center">
+              <div class="me-3">
+                <i class="fas fa-check-circle fa-2x" style="color: var(--success);"></i>
+              </div>
+              <div class="flex-grow-1">
+                <h6 class="fw-bold mb-1">Status SIMRS</h6>
+                <p class="mb-2"><span id="status-message">SIMRS sedang berjalan...</span></p>
+                <p class="small mb-3">Jika aplikasi tidak terbuka secara otomatis, periksa konfigurasi SIMRS di halaman Profil.</p>
+                <button id="close-simrs-btn" class="btn btn-warning btn-sm">
+                  <i class="fas fa-stop-circle me-1"></i> Tutup Sesi SIMRS
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SIMRS Info Card - Secondary Position -->
+          <!-- <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="fas fa-hospital me-2"></i> SIMRS - Sistem Informasi Manajemen Rumah Sakit</h5>
+            </div>
+            <div class="card-body p-4">
+              <div class="text-center mb-4">
+                <img src="../assets/img/simrs-icon.png" class="img-fluid mb-3" alt="SIMRS Logo" style="max-width: 120px;">
+                <h3 class="fw-bold" style="color: var(--teal-dark);">SIMRS Monarch</h3>
+                <p class="text-muted">Sistem Informasi Manajemen Rumah Sakit</p>
+              </div>
+
+              <div class="alert alert-info border-start border-info border-4" style="border-left-width: 4px !important; background-color: rgba(0, 123, 255, 0.05);">
+                <div class="d-flex">
+                  <div class="me-3">
+                    <i class="fas fa-info-circle fa-2x" style="color: var(--info);"></i>
+                  </div>
+                  <div>
+                    <h6 class="fw-bold">Informasi Penggunaan</h6>
+                    <p class="mb-1">Aplikasi akan berjalan di komputer Anda dan aktivitas penggunaan akan dicatat.</p>
+                    <p class="mb-1"><strong>Catatan:</strong> Jika aplikasi SIMRS tidak ditemukan, gunakan halaman Profil untuk mengatur lokasi aplikasi.</p>
+                    <p class="mb-0"><i class="fas fa-terminal"></i> <strong>Jendela Command Prompt (CMD) akan tetap terbuka</strong> untuk menampilkan log dan pesan error.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div> -->
+
+          <!-- SIMRS History Card -->
+          <!-- <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="fas fa-history me-2"></i> Riwayat Penggunaan SIMRS</h5>
+              <button class="btn btn-sm btn-outline-secondary" id="refresh-history">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div id="simrs-history-container" class="p-3">
+                <div class="d-flex justify-content-center align-items-center py-4">
+                  <div class="spinner-border text-primary me-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  <span>Memuat riwayat penggunaan...</span>
+                </div>
+              </div>
+            </div>
+          </div> -->
+        </div>
+      </div>
+    </div>
+
+    <!-- SIMRS Content sudah dipindahkan ke dashboard -->
+
+    <!-- Profile Content -->
+    <div id="profile-content" class="content-section d-none">
+      <div class="row">
+        <div class="col-lg-8 mx-auto">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i> Profil Pengguna</h5>
+            </div>
+            <div class="card-body p-4">
+              <div class="text-center mb-4">
+                <div class="position-relative mx-auto mb-3">
+                  <!-- Profile Photo -->
+                  <div id="profile-photo-container" class="mx-auto rounded-circle bg-teal-light d-flex align-items-center justify-content-center" style="width: 120px; height: 120px; overflow: hidden;">
+                    <img id="profile-photo" src="../assets/img/default-user.png" alt="Foto Profil" class="img-fluid w-100 h-100 object-fit-cover d-none">
+                    <i id="profile-photo-placeholder" class="fas fa-user" style="font-size: 3rem; color: var(--teal);"></i>
+                  </div>
+
+                  <!-- Upload Button -->
+                  <div class="position-absolute bottom-0 end-0">
+                    <label for="photo-upload" class="btn btn-sm btn-primary rounded-circle" style="width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                      <i class="fas fa-camera"></i>
+                    </label>
+                    <input type="file" id="photo-upload" accept="image/*" style="display: none;">
+                  </div>
+                </div>
+
+                <h4 class="fw-bold" id="profile-header-name">Nama Pengguna</h4>
+                <p class="text-muted" id="profile-header-unit">Unit Kerja</p>
+              </div>
+
+              <div id="profile-alert-container"></div>
+
+              <form id="profile-form" class="mt-4">
+                <div class="row g-4">
+                  <!-- Informasi Akun -->
+                  <div class="col-12">
+                    <div class="card border-0 bg-light">
+                      <div class="card-body">
+                        <h6 class="fw-bold mb-3" style="color: var(--teal-dark);"><i class="fas fa-user-shield me-2"></i> Informasi Akun</h6>
+                        <div class="row g-3">
+                          <div class="col-md-6">
+                            <label for="profile-username" class="form-label fw-semibold">Username</label>
+                            <input type="text" class="form-control bg-white" id="profile-username" readonly>
+                          </div>
+                          <div class="col-md-6">
+                            <label for="profile-email" class="form-label fw-semibold">Email</label>
+                            <input type="email" class="form-control" id="profile-email" name="email" required>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Informasi Pribadi -->
+                  <div class="col-12">
+                    <div class="card border-0 bg-light">
+                      <div class="card-body">
+                        <h6 class="fw-bold mb-3" style="color: var(--teal-dark);"><i class="fas fa-address-card me-2"></i> Informasi Pribadi</h6>
+                        <div class="row g-3">
+                          <div class="col-md-6">
+                            <label for="profile-fullname" class="form-label fw-semibold">Nama Lengkap</label>
+                            <input type="text" class="form-control" id="profile-fullname" name="full_name" required>
+                          </div>
+                          <div class="col-md-6">
+                            <label for="profile-contact" class="form-label fw-semibold">Kontak</label>
+                            <input type="text" class="form-control" id="profile-contact" name="contact">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Informasi SIMRS -->
+                  <div class="col-12">
+                    <div class="card border-0 bg-light">
+                      <div class="card-body">
+                        <h6 class="fw-bold mb-3" style="color: var(--teal-dark);"><i class="fas fa-hospital-alt me-2"></i> Informasi SIMRS</h6>
+                        <div class="row g-3">
+                          <div class="col-md-6">
+                            <label for="profile-unit-display" class="form-label fw-semibold">Unit Kerja</label>
+                            <input type="text" class="form-control bg-white" id="profile-unit-display" readonly>
+                            <input type="hidden" id="profile-unit" name="unit_kerja_id">
+                          </div>
+                          <div class="col-md-6">
+                            <label for="profile-simrs-path" class="form-label fw-semibold">Path SIMRS</label>
+                            <div class="input-group">
+                              <input type="text" class="form-control" id="profile-simrs-path" name="simrs_path" placeholder="C:\SIMRS\aplikasi.bat">
+                              <button class="btn btn-outline-primary" type="button" id="browse-simrs-path">
+                                <i class="fas fa-folder-open me-1"></i> Browse
+                              </button>
+                            </div>
+                            <small class="form-text text-muted">Path lengkap ke aplikasi SIMRS</small>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Konfigurasi Shift SIMRS -->
+                  <div class="col-12" id="shift-config-section" style="display: none;">
+                    <div class="card border-0 bg-light">
+                      <div class="card-body">
+                        <h6 class="fw-bold mb-3" style="color: var(--teal-dark);"><i class="fas fa-clock me-2"></i> Konfigurasi Path SIMRS Shift</h6>
+                        
+                        <div class="alert alert-info" role="alert">
+                          <i class="fas fa-info-circle me-2"></i>
+                          <strong>Unit kerja Anda menggunakan sistem shift.</strong> Silakan tentukan path aplikasi SIMRS untuk setiap shift.
+                        </div>
+
+                        <div class="row g-3">
+                          <div class="col-md-6">
+                            <label for="shift-pagi-path" class="form-label fw-semibold">
+                              <i class="fas fa-sun text-warning me-1"></i> Path SIMRS Shift Pagi (08:00 - 16:30)
+                            </label>
+                            <div class="input-group">
+                              <input type="text" class="form-control" id="shift-pagi-path" placeholder="C:\SIMRS\pagi\aplikasi.bat">
+                              <button class="btn btn-outline-primary" type="button" id="browse-shift-pagi-path">
+                                <i class="fas fa-folder-open me-1"></i> Browse
+                              </button>
+                            </div>
+                          </div>
+                          <div class="col-md-6">
+                            <label for="shift-malam-path" class="form-label fw-semibold">
+                              <i class="fas fa-moon text-primary me-1"></i> Path SIMRS Shift Malam (16:30 - 08:00)
+                            </label>
+                            <div class="input-group">
+                              <input type="text" class="form-control" id="shift-malam-path" placeholder="C:\SIMRS\malam\aplikasi.bat">
+                              <button class="btn btn-outline-primary" type="button" id="browse-shift-malam-path">
+                                <i class="fas fa-folder-open me-1"></i> Browse
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div class="alert alert-warning mt-3" role="alert">
+                          <i class="fas fa-exclamation-triangle me-2"></i>
+                          <strong>Informasi Shift:</strong>
+                          <ul class="mb-0 mt-2">
+                            <li><strong>Shift Pagi:</strong> 08:00 - 16:30</li>
+                            <li><strong>Shift Malam:</strong> 16:30 - 08:00 (esok hari)</li>
+                            <li>Sistem akan otomatis mengganti path SIMRS sesuai waktu shift</li>
+                            <li>Sesi SIMRS lama akan ditutup dan yang baru akan dibuka secara otomatis</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Keamanan -->
+                  <div class="col-12">
+                    <div class="card border-0 bg-light">
+                      <div class="card-body">
+                        <h6 class="fw-bold mb-3" style="color: var(--teal-dark);"><i class="fas fa-lock me-2"></i> Keamanan</h6>
+                        <div class="row g-3">
+                          <div class="col-md-6">
+                            <label for="profile-password" class="form-label fw-semibold">Password Baru</label>
+                            <input type="password" class="form-control" id="profile-password" name="password" placeholder="Kosongkan jika tidak ingin mengubah">
+                          </div>
+                          <div class="col-md-6">
+                            <label for="profile-password-confirm" class="form-label fw-semibold">Konfirmasi Password</label>
+                            <input type="password" class="form-control" id="profile-password-confirm" placeholder="Konfirmasi password baru">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                  <button type="submit" class="btn btn-primary px-4">
+                    <i class="fas fa-save me-2"></i> Simpan Perubahan
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../renderer/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal SIMRS - Login</title>
+  <link rel="stylesheet" href="../../node_modules/bootstrap/dist/css/bootstrap.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card login-card shadow">
+          <div class="card-header text-center">
+            <!-- <h4><i class="fas fa-hospital"></i> Portal SIMRS RSUD H. Abdul Aziz Marabahan</h4> -->
+          </div>
+          <div class="card-body">
+            <div class="text-center mb-4">
+              <img src="../assets/img/logo.png" alt="SIWASTA Logo" class="img-fluid login-logo">
+              <h5 class="fw-bold text-teal">Portal SIMRS</h5>
+              <h5 class="fw-bold text-teal">RSUD H. ABDUL AZIZ MARABAHAN</h5>
+              <p class="text-muted">Silakan login untuk melanjutkan</p>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <form id="login-form" class="mb-4">
+              <div class="mb-4">
+                <label for="username" class="form-label fw-semibold">Username</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-user"></i></span>
+                  <input type="text" class="form-control" id="username" name="username" placeholder="Masukkan username" required>
+                </div>
+              </div>
+              <div class="mb-4">
+                <label for="password" class="form-label fw-semibold">Password</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                  <input type="password" class="form-control" id="password" name="password" placeholder="Masukkan password" required>
+                </div>
+              </div>
+              <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                  <i class="fas fa-sign-in-alt me-2"></i> Login
+                </button>
+              </div>
+            </form>
+            <!-- <div class="text-center">
+              <p class="mb-0">Belum punya akun? <a href="register.html" class="text-decoration-none fw-semibold" style="color: var(--teal);">Daftar di sini</a></p>
+            </div> -->
+          </div>
+          <div class="card-footer text-center py-3">
+            <p class="mb-0 text-muted">Portal SIMRS v1.0.0</p>
+          </div>
+        </div>
+
+        <!-- Informasi tambahan -->
+        <div class="card mt-4 shadow-sm">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center">
+              <div class="me-3">
+                <i class="fas fa-info-circle" style="font-size: 1.5rem; color: var(--teal);"></i>
+              </div>
+              <div>
+                <h6 class="mb-1 fw-semibold">Informasi</h6>
+                <p class="mb-0 small text-muted">Aplikasi ini digunakan untuk mengelola dan memantau penggunaan SIMRS di RSUD H. Abdul Aziz Marabahan</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../renderer/login.js"></script>
+</body>
+</html>
