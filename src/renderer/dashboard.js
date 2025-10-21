@@ -931,6 +931,11 @@ async function loadShiftStatus() {
         : shiftStatus.currentShift;
       updateShiftIndicator(effectiveShiftName ? { shift_name: effectiveShiftName } : null);
 
+      // Ensure initial theme matches the effective shift
+      if (window.theme && typeof window.theme.applyThemeByShiftName === 'function') {
+        window.theme.applyThemeByShiftName(effectiveShiftName);
+      }
+
       // Show shift configuration in profile
       const shiftConfigSection = document.getElementById('shift-config-section');
       shiftConfigSection.style.display = 'block';
@@ -1018,6 +1023,13 @@ async function handleManualShiftChange() {
         ? updatedStatus.activeSession.shift
         : updatedStatus.currentShift;
       updateShiftIndicator(effectiveShiftName ? { shift_name: effectiveShiftName } : null);
+
+      // Update page theme to follow the new shift
+      if (window.theme && typeof window.theme.applyThemeByShiftName === 'function') {
+        window.theme.applyThemeByShiftName(effectiveShiftName);
+      } else if (window.theme && typeof window.theme.applyTheme === 'function') {
+        window.theme.applyTheme(effectiveShiftName === 'malam' ? 'dark' : 'light');
+      }
 
       // Reload SIMRS history (only if container exists)
       const hc = document.getElementById('simrs-history-container');

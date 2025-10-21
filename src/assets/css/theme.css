@@ -1,0 +1,148 @@
+/* Global Theme overrides leveraging Bootstrap 5 CSS variables */
+
+/* Light theme defaults */
+body.theme-light {
+  --bs-body-bg: #f6f7fb;
+  --bs-body-color: #111827;
+  --bs-border-color: rgba(0, 0, 0, 0.12);
+
+  --bs-card-bg: #ffffff;
+  --bs-card-color: var(--bs-body-color);
+  --bs-card-border-color: rgba(0, 0, 0, 0.08);
+
+  --bs-link-color: #2563eb;
+  --bs-link-hover-color: #1d4ed8;
+
+  --bs-input-bg: #ffffff;
+  --bs-input-color: #111827;
+  --bs-input-border-color: rgba(0, 0, 0, 0.2);
+
+  --bs-dropdown-bg: #ffffff;
+  --bs-dropdown-link-color: var(--bs-body-color);
+
+  --bs-list-group-bg: #ffffff;
+  --bs-modal-bg: #ffffff;
+}
+
+/* Dark theme overrides */
+body.theme-dark {
+  --bs-body-bg: #0f172a; /* slate-900 */
+  --bs-body-color: #e5e7eb; /* text-gray-200 */
+  --bs-border-color: rgba(255, 255, 255, 0.15);
+
+  --bs-card-bg: #111827; /* gray-900 */
+  --bs-card-color: var(--bs-body-color);
+  --bs-card-border-color: rgba(255, 255, 255, 0.12);
+
+  --bs-link-color: #93c5fd; /* blue-300 */
+  --bs-link-hover-color: #bfdbfe; /* blue-200 */
+
+  --bs-input-bg: #1f2937; /* gray-800 */
+  --bs-input-color: #e5e7eb;
+  --bs-input-border-color: rgba(255, 255, 255, 0.24);
+
+  --bs-dropdown-bg: #1f2937;
+  --bs-dropdown-link-color: #e5e7eb;
+
+  --bs-list-group-bg: #111827;
+  --bs-modal-bg: #111827;
+}
+
+/* Apply general backgrounds and colors */
+body {
+  background-color: var(--bs-body-bg) !important;
+  color: var(--bs-body-color) !important;
+}
+
+.card {
+  background-color: var(--bs-card-bg) !important;
+  color: var(--bs-card-color) !important;
+  border-color: var(--bs-card-border-color) !important;
+}
+
+/* Navbar tweaks */
+.navbar {
+  backdrop-filter: saturate(180%) blur(12px);
+}
+body.theme-light .navbar {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  border-bottom: 1px solid var(--bs-border-color) !important;
+}
+/* Force readable navbar text in light mode even if .navbar-dark is present */
+body.theme-light .navbar .navbar-brand,
+body.theme-light .navbar .navbar-brand i,
+body.theme-light .navbar .nav-link,
+body.theme-light .navbar-dark .navbar-nav .nav-link,
+body.theme-light .navbar .dropdown-toggle,
+body.theme-light .navbar .navbar-toggler {
+  color: #111827 !important; /* slate-900 */
+}
+body.theme-light .navbar-dark .navbar-nav .nav-link:hover,
+body.theme-light .navbar .nav-link:hover {
+  background-color: rgba(17, 24, 39, 0.06) !important;
+  color: #111827 !important;
+}
+body.theme-light .navbar-dark .navbar-nav .nav-link.active,
+body.theme-light .navbar .nav-link.active {
+  background-color: rgba(17, 24, 39, 0.08) !important;
+  color: #111827 !important;
+}
+
+body.theme-dark .navbar {
+  background-color: rgba(17, 24, 39, 0.75) !important; /* gray-900 with opacity */
+  border-bottom: 1px solid var(--bs-border_color, var(--bs-border-color)) !important;
+}
+
+/* Forms */
+.form-control, .form-select {
+  background-color: var(--bs-input-bg) !important;
+  color: var(--bs-input-color) !important;
+  border-color: var(--bs-input-border-color) !important;
+}
+.form-control::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Dropdown and list group */
+.dropdown-menu, .list-group-item {
+  background-color: var(--bs-dropdown-bg) !important;
+  color: var(--bs-dropdown-link-color) !important;
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Alerts (keep Bootstrap contextual colors but adapt backgrounds) */
+body.theme-dark .alert {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: var(--bs-body-color) !important;
+  border-color: var(--bs-border-color) !important;
+}
+
+/* Utility overrides for dark theme */
+body.theme-dark .bg-light {
+  background-color: #1f2937 !important; /* gray-800 */
+}
+body.theme-dark .text-muted {
+  color: #94a3b8 !important; /* slate-400 */
+}
+
+/* Tables */
+.table {
+  color: var(--bs-body-color) !important;
+}
+body.theme-dark .table {
+  --bs-table-bg: #111827;
+  --bs-table-striped-bg: #1f2937;
+  --bs-table-striped-color: var(--bs-body-color);
+  --bs-table-hover-bg: #1f2937;
+  --bs-table-hover-color: var(--bs-body-color);
+}
+
+/* Specific component tweaks used in pages */
+.welcome-card {
+  border: 1px solid var(--bs-card-border-color) !important;
+}
+
+/* Admin header gradient adjust */
+body.theme-dark .admin-header {
+  background: linear-gradient(135deg, #334155 0%, #1f2937 100%) !important; /* slate tones */
+}
