@@ -190,8 +190,8 @@ class AutoRestartService {
     }
 
     this.warningWindow = new BrowserWindow({
-      width: 500,
-      height: 300,
+      width: 600,
+      height: 400,
       resizable: false,
       alwaysOnTop: true,
       frame: false,
@@ -225,42 +225,78 @@ class AutoRestartService {
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           margin: 0;
-          padding: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          padding: 30px;
+          background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
           color: white;
           text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
         }
         .container {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-          padding: 30px;
-          backdrop-filter: blur(10px);
+          background: rgba(255, 255, 255, 0.15);
+          border-radius: 15px;
+          padding: 40px;
+          backdrop-filter: blur(15px);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          max-width: 500px;
+          width: 100%;
         }
         .icon {
-          font-size: 48px;
+          font-size: 64px;
+          margin-bottom: 25px;
+        }
+        h2 {
+          font-size: 28px;
+          margin-bottom: 15px;
+          font-weight: 600;
+        }
+        p {
+          font-size: 16px;
+          line-height: 1.5;
           margin-bottom: 20px;
+          opacity: 0.9;
         }
         .countdown {
-          font-size: 36px;
+          font-size: 48px;
           font-weight: bold;
-          margin: 20px 0;
-          color: #ffeb3b;
+          margin: 30px 0;
+          color: #e74c3c;
+          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
         .buttons {
-          margin-top: 30px;
+          margin-top: 40px;
         }
         button {
-          padding: 10px 20px;
-          margin: 0 10px;
+          padding: 15px 30px;
           border: none;
-          border-radius: 5px;
+          border-radius: 8px;
           cursor: pointer;
-          font-size: 14px;
-          font-weight: bold;
+          font-size: 16px;
+          font-weight: 600;
+          background: #3498db;
+          color: white;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
-        .postpone { background: #ff9800; color: white; }
-        .cancel { background: #f44336; color: white; }
-        .restart { background: #4caf50; color: white; }
+        button:hover {
+          background: #2980b9;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        button:disabled {
+          background: #7f8c8d;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+        .countdown-text {
+          font-size: 14px;
+          opacity: 0.8;
+          margin-top: 10px;
+        }
       </style>
     </head>
     <body>
@@ -271,35 +307,54 @@ class AutoRestartService {
         <div class="countdown" id="countdown">05:00</div>
         <p>Pastikan semua pekerjaan telah disimpan!</p>
         <div class="buttons">
-          <button class="postpone" onclick="postponeRestart()">Tunda 10 Menit</button>
-          <button class="cancel" onclick="cancelRestart()">Batal</button>
-          <button class="restart" onclick="restartNow()">Restart Sekarang</button>
+          <button id="okButton" onclick="handleOkClick()" disabled>OK</button>
         </div>
+        <div class="countdown-text" id="buttonCountdown">Tombol akan aktif dalam 3 detik...</div>
       </div>
       <script>
         let countdownSeconds = ${this.countdownSeconds};
+        let buttonCountdown = 3;
+        
         function updateCountdown() {
           const minutes = Math.floor(countdownSeconds / 60);
           const seconds = countdownSeconds % 60;
           document.getElementById('countdown').textContent = 
-            \`${'${'}minutes.toString().padStart(2, '0')}${'}'}:${'${'}seconds.toString().padStart(2, '0')}${'}'}\`;
-          if (countdownSeconds <= 0) {
-            window.api.forceRestart();
-          } else {
+            minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
+          
+          if (countdownSeconds > 0) {
             countdownSeconds--;
+          } else {
+            // Auto restart when countdown reaches 0
+            window.api.forceRestart();
           }
         }
+        
+        function updateButtonCountdown() {
+          const buttonCountdownEl = document.getElementById('buttonCountdown');
+          const okButton = document.getElementById('okButton');
+          
+          if (buttonCountdown > 0) {
+            buttonCountdownEl.textContent = 'Tombol akan aktif dalam ' + buttonCountdown + ' detik...';
+            buttonCountdown--;
+          } else {
+            buttonCountdownEl.textContent = '';
+            okButton.disabled = false;
+            okButton.textContent = 'OK';
+          }
+        }
+        
+        function handleOkClick() {
+          // Tutup pop-up saja, restart tetap berjalan sesuai jadwal
+          window.close();
+        }
+        
+        // Update countdown every second
         setInterval(updateCountdown, 1000);
-        updateCountdown();
-        function postponeRestart() {
-          window.api.postponeRestart(10);
-        }
-        function cancelRestart() {
-          window.api.cancelRestart();
-        }
-        function restartNow() {
-          window.api.forceRestart();
-        }
+        updateCountdown(); // Initial update
+        
+        // Update button countdown every second
+        setInterval(updateButtonCountdown, 1000);
+        updateButtonCountdown(); // Initial update
       </script>
     </body>
     </html>`;
