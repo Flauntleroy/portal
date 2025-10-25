@@ -586,10 +586,15 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 // Helper function to check server connectivity
-async function checkServerConnectivity(url = 'https://portal.rsudhabdulazizmarabahan.com/api/ping') {
+async function checkServerConnectivity(url = 'https://portal.rsudhabdulazizmarabahan.com/') {
   try {
-    const response = await axios.get(url, { timeout: 5000 });
-    return response.status === 200;
+    // Anggap server reachable jika domain merespons 2xx/3xx pada root
+    const resp = await axios.get(url, {
+      timeout: 5000,
+      maxRedirects: 0,
+      validateStatus: (status) => status >= 200 && status < 400
+    });
+    return !!resp;
   } catch (error) {
     log.warn(`Server connectivity check failed: ${error.message}`);
     return false;
@@ -599,86 +604,200 @@ async function checkServerConnectivity(url = 'https://portal.rsudhabdulazizmarab
 // IPC handler for uploading profile photo
 ipcMain.handle('upload-profile-photo', async (_, userId, photoData) => {
   try {
-    // Check if user exists
     const user = await db.User.findByPk(userId);
     if (!user) {
       return { success: false, message: 'User tidak ditemukan' };
     }
 
-    // Create assets/uploads directory if it doesn't exist (for local backup)
+    // Tentukan mime type dan ekstensi dari data URL
+    const metaMatch = photoData && photoData.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+    const mimeType = metaMatch ? metaMatch[1] : 'image/jpeg';
+    const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/gif' ? 'gif' : 'jpg';
+
     const uploadsDir = path.join(__dirname, 'src', 'assets', 'uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
       log.info(`Created uploads directory: ${uploadsDir}`);
     }
 
-    // Generate unique filename
-    const fileName = `user_${userId}_${Date.now()}.jpg`;
-    const filePath = path.join(uploadsDir, fileName);
+    const fileNameLocal = `user_${userId}_${Date.now()}.${ext}`;
+    const filePathLocal = path.join(uploadsDir, fileNameLocal);
 
-    // Save the image locally as backup
-    const base64Data = photoData.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    fs.writeFileSync(filePath, imageBuffer);
-    log.info(`Saved profile photo locally to: ${filePath}`);
+    const base64Payload = photoData.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Payload, 'base64');
+    fs.writeFileSync(filePathLocal, imageBuffer);
+    log.info(`Saved profile photo locally: ${fileNameLocal}`);
 
-    // Upload to web server
-    let uploadSuccess = false;
+    let serverFilename = fileNameLocal;
+    let serverUrl = null;
+    let uploadedToServer = false;
+    let serverVerified = false;
 
-    // First check if server is reachable
+    // Coba upload ke server jika reachable
     const isServerReachable = await checkServerConnectivity();
-
     if (isServerReachable) {
       try {
-        // Create form data for file upload
         const formData = new FormData();
-        formData.append('file', imageBuffer, {
-          filename: fileName,
-          contentType: 'image/jpeg',
-        });
+        formData.append('photo', imageBuffer, { filename: serverFilename, contentType: mimeType });
+        formData.append('file', imageBuffer, { filename: serverFilename, contentType: mimeType });
+        formData.append('user_id', String(userId));
+        formData.append('filename', serverFilename);
 
-        // Upload to server
-        const response = await axios.post(
-          'https://portal.rsudhabdulazizmarabahan.com/api/upload_photo',
-          formData,
-          {
-            headers: {
-              ...formData.getHeaders(),
-              'Content-Type': 'multipart/form-data',
-            },
-            timeout: 10000, // 10 seconds timeout
+        const reqOptions = {
+          headers: formData.getHeaders(),
+          timeout: 20000,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
+          validateStatus: (s) => s >= 200 && s < 300
+        };
+
+        const base = 'https://portal.rsudhabdulazizmarabahan.com';
+
+        // Legacy upload: direct POST to /uploads/upload.php using file stream
+        try {
+          const legacyUrl = `${base}/uploads/upload.php`;
+          log.info(`Trying legacy upload endpoint: ${legacyUrl}`);
+          const legacyForm = new FormData();
+          legacyForm.append('file', fs.createReadStream(filePathLocal), {
+            filename: serverFilename,
+            contentType: mimeType,
+          });
+          const legacyResp = await axios.post(legacyUrl, legacyForm, {
+            headers: legacyForm.getHeaders(),
+            timeout: 30000,
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+            validateStatus: (s) => s >= 200 && s < 300
+          });
+          const legacyData = legacyResp?.data || {};
+          if (legacyData && (legacyData.success === true || legacyData.status === 'ok')) {
+            uploadedToServer = true;
+            if (legacyData.filename || legacyData.fileName || legacyData.name) {
+              serverFilename = legacyData.filename || legacyData.fileName || legacyData.name;
+            }
+            serverUrl =
+              legacyData.photo_url ||
+              legacyData.file_url ||
+              legacyData.url ||
+              legacyData.path ||
+              `${base}/uploads/photos/${serverFilename}`;
+            log.info(`Legacy upload succeeded: ${serverFilename}`);
+          } else {
+            log.warn(`Legacy upload responded without success: ${JSON.stringify(legacyData)}`);
           }
-        );
-
-        if (response.data && response.data.success) {
-          uploadSuccess = true;
-          log.info(`Uploaded profile photo to server: ${fileName}`);
-        } else {
-          log.warn(`Server upload failed but will continue with local file: ${response.data?.message || 'Unknown error'}`);
+        } catch (legacyErr) {
+          log.warn(`Legacy upload failed: ${legacyErr.message}`);
         }
-      } catch (uploadError) {
-        log.warn(`Error uploading to server, will continue with local file: ${uploadError.message}`);
+
+        // Fallback: direct PUT to /uploads/photos/<filename> if legacy failed
+        if (!uploadedToServer) {
+          try {
+            const putUrl = `${base}/uploads/photos/${serverFilename}`;
+            log.info(`Trying direct PUT to: ${putUrl}`);
+            const putResp = await axios.put(putUrl, imageBuffer, {
+              headers: { 'Content-Type': mimeType },
+              timeout: 30000,
+              validateStatus: (s) => s >= 200 && s < 300
+            });
+            if (putResp && putResp.status >= 200 && putResp.status < 300) {
+              uploadedToServer = true;
+              serverUrl = putUrl;
+              log.info(`Direct PUT upload succeeded: ${serverFilename}`);
+            } else {
+              log.warn(`Direct PUT failed with status: ${putResp?.status}`);
+            }
+          } catch (putErr) {
+            log.warn(`Direct PUT error: ${putErr.message}`);
+          }
+        }
+
+        // Modern endpoints: try API/root handlers if still not uploaded
+        let response;
+        let lastErr;
+        if (!uploadedToServer) {
+          const endpoints = [
+            `${base}/api/upload_photo`,
+            `${base}/api/upload_photo.php`,
+            `${base}/upload_photo`,
+            `${base}/upload_photo.php`
+          ];
+          for (const url of endpoints) {
+            try {
+              log.info(`Trying upload endpoint: ${url}`);
+              response = await axios.post(url, formData, reqOptions);
+              log.info(`Upload succeeded at: ${url}`);
+              break;
+            } catch (err) {
+              const status = err?.response?.status;
+              log.warn(`Upload endpoint failed (${status || 'no-status'}): ${url} -> ${err.message}`);
+              lastErr = err;
+            }
+          }
+          if (!response) {
+            throw lastErr || new Error('All upload endpoints failed');
+          }
+
+          const data = response?.data || {};
+          uploadedToServer = true;
+
+          if (data.filename || data.fileName || data.name) {
+            serverFilename = data.filename || data.fileName || data.name;
+          }
+          serverUrl =
+            data.photo_url ||
+            data.file_url ||
+            data.url ||
+            data.path ||
+            `${base}/uploads/photos/${serverFilename}`;
+        }
+
+        // Jika server mengganti nama file, duplikasi lokal untuk konsistensi fallback
+        if (serverFilename !== fileNameLocal) {
+          const serverLocalPath = path.join(uploadsDir, serverFilename);
+          try {
+            fs.copyFileSync(filePathLocal, serverLocalPath);
+            log.info(`Duplicated local photo as server filename: ${serverFilename}`);
+          } catch (copyErr) {
+            log.warn(`Failed duplicating local photo to server filename: ${copyErr.message}`);
+          }
+        }
+
+        // Verifikasi URL (optional, tidak menggugurkan keberhasilan upload jika HEAD tidak didukung)
+        if (uploadedToServer && serverUrl) {
+          try {
+            const headResp = await axios.head(serverUrl, { timeout: 7000 });
+            serverVerified = headResp.status >= 200 && headResp.status < 400;
+            if (serverVerified) {
+              log.info(`Server photo verified at: ${serverUrl}`);
+            } else {
+              log.warn(`Server photo URL not OK (${headResp.status}).`);
+            }
+          } catch (verErr) {
+            log.warn(`Cannot verify server photo URL via HEAD: ${verErr.message}`);
+          }
+        }
+      } catch (uploadErr) {
+        log.warn(`Upload to server failed: ${uploadErr.message}`);
       }
     } else {
-      log.warn(`Server is not reachable, will use local file only`);
+      log.warn('Server is not reachable; using local photo.');
     }
 
-    // Update user record with just the filename (not the full path)
-    await user.update({ photo: fileName });
-    log.info(`Updated user ${userId} with photo filename: ${fileName}`);
+    // Simpan nama file (prioritaskan nama dari server) di database user
+    await user.update({ photo: serverFilename });
+    log.info(`Updated user ${userId} with photo filename: ${serverFilename}`);
 
-    // Construct the full URL for the photo
-    const photoUrl = uploadSuccess
-      ? `https://portal.rsudhabdulazizmarabahan.com/uploads/photos/${fileName}`
-      : `../assets/uploads/${fileName}`;
+    const photoUrl = uploadedToServer ? serverUrl : `../assets/uploads/${serverFilename}`;
 
     return {
       success: true,
-      message: uploadSuccess
-        ? 'Foto profil berhasil diupload ke server'
-        : 'Foto profil disimpan secara lokal (gagal upload ke server)',
+      uploaded_to_server: uploadedToServer,
+      server_verified: serverVerified,
+      message: uploadedToServer
+        ? (serverVerified ? 'Foto profil diupload & diverifikasi di server' : 'Foto profil diupload ke server')
+        : 'Foto profil disimpan lokal (server tidak tersedia)',
       photoPath: photoUrl,
-      fileName: fileName
+      fileName: serverFilename
     };
   } catch (error) {
     log.error('Error uploading profile photo:', error);

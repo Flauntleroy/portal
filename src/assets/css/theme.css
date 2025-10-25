@@ -110,6 +110,16 @@ body.theme-dark .navbar {
   border-color: var(--bs-border-color) !important;
 }
 
+/* Ensure select option text is readable on all themes */
+select option {
+  color: #111827; /* default for light */
+  background-color: #ffffff;
+}
+body.theme-dark select option {
+  color: #e5e7eb !important; /* text-gray-200 */
+  background-color: #1f2937 !important; /* gray-800 */
+}
+
 /* Alerts (keep Bootstrap contextual colors but adapt backgrounds) */
 body.theme-dark .alert {
   background-color: rgba(255, 255, 255, 0.06) !important;

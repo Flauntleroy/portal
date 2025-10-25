@@ -493,69 +493,88 @@ function fillProfileForm() {
 // Load unit kerja data for profile form
 async function loadUnitKerjaData() {
   try {
-    // Make sure currentUser is loaded before proceeding
     if (!currentUser) {
       console.log('Waiting for currentUser to be loaded...');
       await new Promise(resolve => setTimeout(resolve, 500));
-      if (!currentUser) {
-        console.warn('currentUser still not loaded, proceeding with caution');
-      }
     }
 
     console.log('Loading unit kerja data...');
+
+    let retries = 0;
+    let unitSelect, unitHiddenInput;
+    while (retries < 10) {
+      unitSelect = document.getElementById('profile-unit-select');
+      unitHiddenInput = document.getElementById('profile-unit');
+      if (unitSelect && unitHiddenInput) break;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries++;
+    }
+
+    if (!unitSelect || !unitHiddenInput) {
+      console.error('Unit kerja select or hidden input not found after retries');
+      return;
+    }
+
+    console.log('DOM elements found, fetching unit kerja data...');
     const unitKerjaList = await window.api.getAllUnitKerja();
-    console.log('Unit kerja data loaded:', unitKerjaList);
+    console.log('Raw unit kerja data:', unitKerjaList);
 
-    // Set unit kerja hidden input value
-    const unitInput = document.getElementById('profile-unit');
-    if (!unitInput) {
-      console.error('Unit kerja hidden input element not found');
+    if (!Array.isArray(unitKerjaList)) {
+      console.error('Unit kerja data is not an array:', unitKerjaList);
       return;
     }
 
-    // Set unit kerja display field
-    const unitDisplayField = document.getElementById('profile-unit-display');
-    if (!unitDisplayField) {
-      console.error('Unit kerja display field not found');
-      return;
-    }
+    // Normalize possible Sequelize instances to plain objects
+    const normalizedUnits = unitKerjaList
+      .map(u => (u && u.dataValues) ? u.dataValues : u)
+      .filter(u => !!u);
 
-    // Find and display unit kerja name
+    // Populate options (no longer excluding any unit)
+    unitSelect.innerHTML = '<option value="" disabled selected>Pilih unit kerja</option>';
+    normalizedUnits.forEach(unit => {
+      const opt = document.createElement('option');
+      opt.value = unit.id;
+      opt.textContent = unit.nama || unit.name || '-';
+      unitSelect.appendChild(opt);
+      console.log(`Added option: ${opt.textContent} (ID: ${unit.id})`);
+    });
+    console.log('Dropdown populated with', normalizedUnits.length, 'options');
+
+    // Set selected value if currentUser has unit_kerja_id and exists
     if (currentUser && currentUser.unit_kerja_id) {
-      console.log('Setting unit kerja display:', currentUser.unit_kerja_id);
-      unitInput.value = currentUser.unit_kerja_id;
-
-      // Find the unit kerja name
-      let unitName = 'Tidak bisa diubah';
-      if (Array.isArray(unitKerjaList)) {
-        const unitKerja = unitKerjaList.find(unit => unit.id == currentUser.unit_kerja_id);
-        if (unitKerja) {
-          unitName = unitKerja.nama;
-        }
-      }
-
-      console.log('Unit kerja name:', unitName);
-      unitDisplayField.value = unitName;
-
-      // Update profile header unit
-      if (document.getElementById('profile-header-unit')) {
-        document.getElementById('profile-header-unit').textContent = unitName;
+      const exists = normalizedUnits.some(u => String(u.id) === String(currentUser.unit_kerja_id));
+      if (exists) {
+        unitSelect.value = String(currentUser.unit_kerja_id);
+        unitHiddenInput.value = String(currentUser.unit_kerja_id);
+        const selectedUnit = normalizedUnits.find(u => String(u.id) === String(currentUser.unit_kerja_id));
+        const headerEl = document.getElementById('profile-header-unit');
+        if (headerEl) headerEl.textContent = selectedUnit ? selectedUnit.nama : 'Belum dipilih';
+      } else {
+        unitSelect.value = '';
+        unitHiddenInput.value = '';
+        const headerEl = document.getElementById('profile-header-unit');
+        if (headerEl) headerEl.textContent = 'Belum dipilih';
+        console.warn('Current user unit not found in list:', currentUser.unit_kerja_id);
       }
     } else {
-      console.log('No unit kerja selected or currentUser not loaded');
-      unitDisplayField.value = 'Belum dipilih';
-
-      // Update profile header unit when no unit is selected
-      if (document.getElementById('profile-header-unit')) {
-        document.getElementById('profile-header-unit').textContent = 'Unit Kerja: Belum dipilih';
-      }
+      unitSelect.value = '';
+      unitHiddenInput.value = '';
+      const headerEl = document.getElementById('profile-header-unit');
+      if (headerEl) headerEl.textContent = 'Belum dipilih';
     }
+
+    // Change listener to reflect selection to hidden input and header
+    unitSelect.addEventListener('change', () => {
+      unitHiddenInput.value = unitSelect.value;
+      const selectedUnit = normalizedUnits.find(u => String(u.id) === String(unitSelect.value));
+      const headerEl = document.getElementById('profile-header-unit');
+      if (headerEl) headerEl.textContent = selectedUnit ? selectedUnit.nama : 'Belum dipilih';
+      console.log('Unit changed to:', selectedUnit ? selectedUnit.nama : 'None');
+    });
+
+    console.log('Unit kerja data loading completed successfully');
   } catch (error) {
     console.error('Error loading unit kerja data:', error);
-    // Show error in profile alert
-    if (document.getElementById('profile-alert-container')) {
-      showProfileAlert('warning', 'Gagal memuat data unit kerja. Silakan refresh halaman.');
-    }
   }
 }
 
@@ -580,13 +599,16 @@ async function updateProfile(e) {
   try {
     showProfileAlert('info', 'Menyimpan perubahan...');
 
+    // Ambil unit kerja dari dropdown jika tersedia
+    const unitSelect = document.getElementById('profile-unit-select');
+    const selectedUnitId = unitSelect && unitSelect.value ? parseInt(unitSelect.value, 10) : currentUser.unit_kerja_id;
+
     const formData = {
       id: currentUser.id,
       email: document.getElementById('profile-email').value,
       full_name: document.getElementById('profile-fullname').value,
       contact: document.getElementById('profile-contact').value,
-      // Gunakan unit_kerja_id yang sudah ada, tidak bisa diubah
-      unit_kerja_id: currentUser.unit_kerja_id,
+      unit_kerja_id: selectedUnitId,
       simrs_path: document.getElementById('profile-simrs-path').value
     };
 
@@ -607,7 +629,16 @@ async function updateProfile(e) {
       document.getElementById('fullname-display').textContent = currentUser.full_name;
       document.getElementById('profile-header-name').textContent = currentUser.full_name || currentUser.username;
 
-      // Unit kerja tidak berubah, jadi tidak perlu memperbarui tampilan unit kerja
+      // Update unit selection after save
+      const unitKerjaList = await window.api.getAllUnitKerja();
+      const selectedUnit = (unitKerjaList || []).find(u => String(u.id) === String(currentUser.unit_kerja_id));
+      if (document.getElementById('profile-header-unit')) {
+        document.getElementById('profile-header-unit').textContent = selectedUnit ? selectedUnit.nama : 'Belum dipilih';
+      }
+      const unitSelectEl = document.getElementById('profile-unit-select');
+      const unitHiddenEl = document.getElementById('profile-unit');
+      if (unitSelectEl) unitSelectEl.value = String(currentUser.unit_kerja_id || '');
+      if (unitHiddenEl) unitHiddenEl.value = String(currentUser.unit_kerja_id || '');
 
       // Update shift configuration if shift system is being used
       const usesEl = document.getElementById('uses-shift-system');

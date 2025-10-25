@@ -280,14 +280,16 @@
                         <h6 class="fw-bold mb-3" style="color: var(--teal-dark);"><i class="fas fa-hospital-alt me-2"></i> Informasi SIMRS</h6>
                         <div class="row g-3">
                           <div class="col-md-6">
-                            <label for="profile-unit-display" class="form-label fw-semibold">Unit Kerja</label>
-                            <input type="text" class="form-control bg-white" id="profile-unit-display" readonly>
+                            <label for="profile-unit-select" class="form-label fw-semibold">Unit Kerja</label>
+                            <select class="form-select" id="profile-unit-select" name="unit_kerja_select">
+                              <option value="" disabled selected>Pilih unit kerja</option>
+                            </select>
                             <input type="hidden" id="profile-unit" name="unit_kerja_id">
                           </div>
                           <div class="col-md-6">
                             <label for="profile-simrs-path" class="form-label fw-semibold">Path SIMRS</label>
                             <div class="input-group">
-                              <input type="text" class="form-control" id="profile-simrs-path" name="simrs_path" placeholder="C:\SIMRS\aplikasi.bat">
+                              <input type="text" class="form-control" id="profile-simrs-path" name="simrs_path" placeholder="C:\\SIMRS\\aplikasi.bat">
                               <button class="btn btn-outline-primary" type="button" id="browse-simrs-path">
                                 <i class="fas fa-folder-open me-1"></i> Browse
                               </button>
