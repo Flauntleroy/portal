@@ -26,6 +26,9 @@ class AutoRestartService {
     this.stateFile = path.join(app.getPath('userData'), 'auto-restart-state.json');
     this.pendingShiftName = null;
     this.pendingShiftEndTime = null;
+    // New: two-phase warning flags
+    this.shownEarlyWarning = false; // ditampilkan pada sisa 6:30
+    this.shownFinalWarning = false; // ditampilkan pada sisa 0:30
   }
 
   /**
@@ -113,19 +116,26 @@ class AutoRestartService {
       // Hitung waktu berakhirnya shift saat ini
       const now = new Date();
       const shiftEndTime = this.calculateShiftEndTime(currentShift, now);
-      const timeUntilEnd = shiftEndTime.getTime() - now.getTime();
-      const minutesUntilEnd = Math.floor(timeUntilEnd / (1000 * 60));
+      const timeUntilEndMs = shiftEndTime.getTime() - now.getTime();
+      const secondsUntilEnd = Math.ceil(timeUntilEndMs / 1000);
+      const minutesUntilEnd = Math.floor(timeUntilEndMs / (1000 * 60));
 
-      log.debug(`Shift ${currentShift.shift_name} berakhir dalam ${minutesUntilEnd} menit`);
+      log.debug(`Shift ${currentShift.shift_name} berakhir dalam ${minutesUntilEnd} menit (${secondsUntilEnd} detik)`);
 
-      // If already restarted for this shift end, skip
+      // Reset phase flags saat masih jauh dari threshold
+      if (secondsUntilEnd > 390) {
+        this.shownEarlyWarning = false;
+        this.shownFinalWarning = false;
+      }
+
+      // Skip jika restart sudah dilakukan untuk akhir shift ini
       if (this.hasRestartedForShift(currentShift.shift_name, shiftEndTime)) {
         log.info('Restart untuk shift ini sudah dilakukan sebelumnya. Melewati.');
         return;
       }
 
-      // Jika sudah melewati waktu berakhir shift, tampilkan warning dengan delay 1 menit
-      if (timeUntilEnd <= 0 && !this.pendingRestart) {
+      // Setelah lewat end_time: tampilkan warning dengan delay 1 menit jika belum pending
+      if (secondsUntilEnd <= 0 && !this.pendingRestart) {
         log.info('Waktu shift telah berakhir, menampilkan peringatan dengan delay 1 menit');
         this.pendingShiftName = currentShift.shift_name;
         this.pendingShiftEndTime = shiftEndTime;
@@ -133,12 +143,38 @@ class AutoRestartService {
         return;
       }
 
-      // Jika mendekati waktu berakhir shift dan belum ada peringatan
-      if (minutesUntilEnd <= this.config.warningMinutes && !this.pendingRestart) {
+      // Fase final: 30 detik tersisa
+      if (secondsUntilEnd <= 30 && !this.shownFinalWarning) {
+        // Jika window sudah ditutup sebelumnya, tampilkan kembali; jika masih terbuka, biarkan
+        if (!this.warningWindow || this.warningWindow.isDestroyed()) {
+          log.info('Sisa 30 detik, menampilkan peringatan final');
+          this.pendingShiftName = currentShift.shift_name;
+          this.pendingShiftEndTime = shiftEndTime;
+          await this.showRestartWarning(Math.ceil(secondsUntilEnd / 60), shiftEndTime);
+        } else {
+          log.info('Sisa 30 detik, window peringatan sudah aktif');
+        }
+        this.shownFinalWarning = true;
+        return;
+      }
+
+      // Fase awal: 6 menit 30 detik tersisa
+      if (secondsUntilEnd <= 390 && !this.shownEarlyWarning && !this.pendingRestart) {
+        log.info(`Sisa ${minutesUntilEnd} menit (${secondsUntilEnd} detik), menampilkan peringatan awal`);
+        this.pendingShiftName = currentShift.shift_name;
+        this.pendingShiftEndTime = shiftEndTime;
+        await this.showRestartWarning(minutesUntilEnd, shiftEndTime);
+        this.shownEarlyWarning = true;
+        return;
+      }
+
+      // Fallback lama: jika mendekati warningMinutes dan belum ada peringatan
+      if (minutesUntilEnd <= this.config.warningMinutes && !this.pendingRestart && !this.shownEarlyWarning) {
         log.info(`Shift akan berakhir dalam ${minutesUntilEnd} menit, menampilkan peringatan`);
         this.pendingShiftName = currentShift.shift_name;
         this.pendingShiftEndTime = shiftEndTime;
         await this.showRestartWarning(minutesUntilEnd, shiftEndTime);
+        this.shownEarlyWarning = true;
       }
 
     } catch (error) {
@@ -194,8 +230,8 @@ class AutoRestartService {
     }
 
     this.warningWindow = new BrowserWindow({
-      width: 600,
-      height: 400,
+      width: 860,
+      height: 360,
       resizable: false,
       alwaysOnTop: true,
       frame: false,
@@ -226,117 +262,110 @@ class AutoRestartService {
       <meta charset="UTF-8">
       <title>Peringatan Restart Aplikasi</title>
       <style>
+        :root {
+          --bg: #0f172a; /* slate-900 */
+          --panel: #111827; /* gray-900 */
+          --text: #e5e7eb; /* text-gray-200 */
+          --muted: #94a3b8; /* slate-400 */
+          --border: rgba(255, 255, 255, 0.12);
+          --accent: #1a8e83; /* portal teal */
+          --accent-hover: #0e6b62;
+          --danger: #ef4444; /* red-500 */
+          --warning: #38bdf8; /* sky-300 */
+        }
+        html, body { height: 100%; }
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           margin: 0;
-          padding: 30px;
-          background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-          color: white;
-          text-align: center;
+          padding: 0;
+          background: var(--bg);
+          color: var(--text);
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: 100vh;
         }
-        .container {
-          background: rgba(255, 255, 255, 0.15);
-          border-radius: 15px;
-          padding: 40px;
-          backdrop-filter: blur(15px);
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          max-width: 500px;
-          width: 100%;
+        .wrapper {
+          width: 90vw;
+          max-width: 900px;
+          min-width: 700px;
         }
-        .icon {
-          font-size: 64px;
-          margin-bottom: 25px;
+        .panel {
+          background: var(--panel);
+          border-radius: 12px;
+          padding: 24px 28px;
+          border: 1px solid var(--border);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.35);
         }
-        h2 {
-          font-size: 28px;
-          margin-bottom: 15px;
-          font-weight: 600;
+        .header {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 10px;
         }
-        p {
-          font-size: 16px;
-          line-height: 1.5;
-          margin-bottom: 20px;
-          opacity: 0.9;
-        }
+        .icon { font-size: 42px; color: var(--danger); }
+        .title { font-size: 22px; font-weight: 700; }
+        .message { color: var(--muted); margin-bottom: 16px; }
         .countdown {
-          font-size: 48px;
-          font-weight: bold;
-          margin: 30px 0;
-          color: #e74c3c;
-          text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          font-size: 56px;
+          font-weight: 800;
+          color: var(--warning);
+          letter-spacing: 1px;
         }
-        .buttons {
-          margin-top: 40px;
-        }
-        button {
-          padding: 15px 30px;
+        .hint { font-size: 13px; color: var(--muted); }
+        .actions { margin-top: 20px; display: flex; justify-content: center; }
+        #okButton {
+          padding: 14px 40px;
+          font-size: 18px;
+          font-weight: 700;
           border: none;
-          border-radius: 8px;
+          border-radius: 10px;
+          background: var(--accent);
+          color: #fff;
           cursor: pointer;
-          font-size: 16px;
-          font-weight: 600;
-          background: #3498db;
-          color: white;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
-        button:hover {
-          background: #2980b9;
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-        }
-        button:disabled {
-          background: #7f8c8d;
-          cursor: not-allowed;
-          transform: none;
-          box-shadow: none;
-        }
-        .countdown-text {
-          font-size: 14px;
-          opacity: 0.8;
-          margin-top: 10px;
+        #okButton:disabled { opacity: 0.6; cursor: not-allowed; }
+        #okButton:hover:not(:disabled) { background: var(--accent-hover); }
+        .button-countdown { text-align: center; margin-top: 8px; color: var(--warning); font-weight: 600; }
+        @media (max-width: 760px) {
+          .wrapper { min-width: auto; width: 96vw; }
+          .countdown { font-size: 44px; }
+          #okButton { padding: 12px 28px; font-size: 16px; }
         }
       </style>
     </head>
     <body>
-      <div class="container">
-        <div class="icon">⚠️</div>
-        <h2>Aplikasi Akan Restart</h2>
-        <p>Shift kerja akan berakhir dan aplikasi perlu direstart untuk pergantian shift.</p>
-        <div class="countdown" id="countdown">05:00</div>
-        <p>Pastikan semua pekerjaan telah disimpan!</p>
-        <div class="buttons">
-          <button id="okButton" onclick="handleOkClick()" disabled>OK</button>
+      <div class="wrapper">
+        <div class="panel">
+          <div class="header">
+            <div class="icon">⚠️</div>
+            <div class="title">SIMRS Akan Restart</div>
+          </div>
+          <div class="message">Portal SIMRS akan restart dalam 5 menit. Pastikan semua data SIMRS sudah disimpan.</div>
+          <div class="countdown" id="countdown">05:00</div>
+          <div class="hint">Pastikan inputan SIMRS sudah disimpan.</div>
+          <div class="actions">
+            <button id="okButton" onclick="handleOkClick()" disabled>OK</button>
+          </div>
+          <div class="button-countdown" id="buttonCountdown">Tombol akan aktif dalam 3 detik...</div>
         </div>
-        <div class="countdown-text" id="buttonCountdown">Tombol akan aktif dalam 3 detik...</div>
       </div>
       <script>
         let countdownSeconds = ${this.countdownSeconds};
         let buttonCountdown = 3;
-        
         function updateCountdown() {
           const minutes = Math.floor(countdownSeconds / 60);
           const seconds = countdownSeconds % 60;
           document.getElementById('countdown').textContent = 
             minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
-          
           if (countdownSeconds > 0) {
             countdownSeconds--;
           } else {
-            // Auto restart when countdown reaches 0
             window.api.forceRestart();
           }
         }
-        
         function updateButtonCountdown() {
           const buttonCountdownEl = document.getElementById('buttonCountdown');
           const okButton = document.getElementById('okButton');
-          
           if (buttonCountdown > 0) {
             buttonCountdownEl.textContent = 'Tombol akan aktif dalam ' + buttonCountdown + ' detik...';
             buttonCountdown--;
@@ -346,19 +375,13 @@ class AutoRestartService {
             okButton.textContent = 'OK';
           }
         }
-        
         function handleOkClick() {
-          // Tutup pop-up saja, restart tetap berjalan sesuai jadwal
           window.close();
         }
-        
-        // Update countdown every second
         setInterval(updateCountdown, 1000);
-        updateCountdown(); // Initial update
-        
-        // Update button countdown every second
+        updateCountdown();
         setInterval(updateButtonCountdown, 1000);
-        updateButtonCountdown(); // Initial update
+        updateButtonCountdown();
       </script>
     </body>
     </html>`;

@@ -281,6 +281,38 @@ function showAlert(message, type = 'info') {
     }, 5000);
 }
 
+/**
+ * Load and render saved shift times from DB
+ */
+async function loadShiftTimes() {
+    try {
+        const schedules = await window.api.getAllShifts();
+        const pagi = schedules.find(s => (s.shift_name || s.name) === 'pagi');
+        const malam = schedules.find(s => (s.shift_name || s.name) === 'malam');
+
+        const pagiEl = document.getElementById('saved-shift-pagi');
+        const malamEl = document.getElementById('saved-shift-malam');
+
+        if (pagi && pagiEl) {
+            const start = (pagi.start_time || '').slice(0,5);
+            const end = (pagi.end_time || '').slice(0,5);
+            pagiEl.textContent = start && end ? `${start} — ${end}` : 'Belum diatur';
+        }
+        if (malam && malamEl) {
+            const start = (malam.start_time || '').slice(0,5);
+            const end = (malam.end_time || '').slice(0,5);
+            const overnight = malam.is_overnight ?? malam.overnight ?? false;
+            malamEl.textContent = start && end ? `${start} — ${end}${overnight ? ' (Overnight)' : ''}` : 'Belum diatur';
+        }
+    } catch (error) {
+        console.error('Error loading shift times:', error);
+        const pagiEl = document.getElementById('saved-shift-pagi');
+        const malamEl = document.getElementById('saved-shift-malam');
+        if (pagiEl) pagiEl.textContent = 'Error memuat';
+        if (malamEl) malamEl.textContent = 'Error memuat';
+    }
+}
+
 // Form submit handler
 document.getElementById('config-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -292,6 +324,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadConfig();
     await loadStatus();
     await loadBackupList();
+    await loadShiftTimes();
     
     // Start status update interval
     statusUpdateInterval = setInterval(async () => {
