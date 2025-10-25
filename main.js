@@ -12,6 +12,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const log = require('electron-log');
 const { Op } = require('sequelize');
+const os = require('os');
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -148,6 +149,20 @@ app.on('activate', () => {
 });
 
 // IPC handlers for authentication
+// Helper: ambil IPv4 lokal non-internal
+function getLocalIPv4() {
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const iface of ifaces[name] || []) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+  } catch (e) {}
+  return null;
+}
 ipcMain.handle('login', async (_, credentials) => {
   try {
     const { username, password } = credentials;
@@ -178,6 +193,43 @@ ipcMain.handle('login', async (_, credentials) => {
       ip_address: '127.0.0.1', // Local app
       success: true
     });
+
+    // Enforce: user aktif per unit di portal harus yang baru login
+    try {
+      const unitId = user.unit_kerja_id;
+      const ip = getLocalIPv4() || '127.0.0.1';
+      const currentShift = await shiftService.getCurrentShift();
+
+      // Tutup semua sesi aktif unit ini yang bukan milik user yang baru login
+      const activeSessions = await db.SimrsUsage.findAll({
+        where: { unit_kerja_id: unitId, status: 'active' }
+      });
+      for (const s of activeSessions) {
+        if (s.user_id !== user.id) {
+          await s.closeSession(
+            `Automatically closed due to new user (${user.username || user.nama}) logging in from the same unit`
+          );
+        }
+      }
+
+      // Buat sesi aktif baru untuk user yang baru login
+      await db.SimrsUsage.create({
+        user_id: user.id,
+        unit_kerja_id: unitId,
+        ip_address: ip,
+        start_time: new Date(),
+        status: 'active',
+        current_shift:
+          user.UnitKerja && user.UnitKerja.uses_shift_system && user.UnitKerja.shift_enabled && currentShift
+            ? currentShift.shift_name
+            : null,
+        shift_auto_started: false,
+        notes: 'Session created at login to reflect active user per unit'
+      });
+      log.info(`Active user for unit ${unitId} set to user ${user.id} at login`);
+    } catch (enforceErr) {
+      log.warn('Failed to enforce active user per unit on login:', enforceErr);
+    }
 
     // Return user data (excluding password)
     const userData = user.toJSON();
