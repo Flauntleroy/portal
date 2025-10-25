@@ -28,4 +28,11 @@ contextBridge.exposeInMainWorld('api', {
   getShiftStatus: (unitId) => ipcRenderer.invoke('get-shift-status', unitId),
   manualShiftChange: (payload) => ipcRenderer.invoke('manual-shift-change', payload),
   updateUnitShiftConfig: (config) => ipcRenderer.invoke('update-unit-shift-config', config),
+
+  // Chat overlay notifications
+  notifyChat: (payload) => ipcRenderer.send('chat:notify', payload),
+  onChatOpenModal: (handler) => ipcRenderer.on('chat:open-modal', (_, data) => { try { if (typeof handler === 'function') handler(data); } catch (e) {} }),
+  onChatOverlayMessage: (handler) => ipcRenderer.on('chat:overlay-message', (_, data) => { try { if (typeof handler === 'function') handler(data); } catch (e) {} }),
+  openChatFromOverlay: (payload) => ipcRenderer.send('chat:open-modal', payload),
+  closeChatOverlay: () => ipcRenderer.send('chat:overlay-close'),
 });

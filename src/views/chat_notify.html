@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Notifikasi Chat</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; font-family: 'Poppins', 'Segoe UI', Tahoma, sans-serif; }
+    .container {
+      box-shadow: 0 12px 30px rgba(0,0,0,.35);
+      border-radius: 12px;
+      background: rgba(19, 23, 28, 0.96);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.12);
+      width: 100%; height: 100%;
+      padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
+    .name { display: flex; align-items: center; gap: 8px; }
+    .body { flex: 1; display: flex; align-items: flex-end; }
+    .bubble { background: #ffffff; color: #0b1320; padding: 8px 10px; border-radius: 10px; max-width: 92%; line-height: 1.35; word-break: break-word; }
+    .footer { display: flex; justify-content: flex-end; gap: 8px; }
+    .btn { border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-weight: 600; }
+    .btn-primary { background: #1a8e83; color: #fff; }
+    .btn-primary:hover { background: #0e6b62; }
+    .btn-muted { background: rgba(255,255,255,.18); color: #fff; }
+    .btn-muted:hover { background: rgba(255,255,255,.28); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="name">
+        <span id="senderName">Pengguna</span>
+      </div>
+      <div><small style="opacity:.8">Pesan baru</small></div>
+    </div>
+    <div class="body">
+      <div class="bubble" id="messageText">Pesan masuk…</div>
+    </div>
+    <div class="footer">
+      <button class="btn btn-muted" id="btnClose">Tutup</button>
+      <button class="btn btn-primary" id="btnReply">Balas</button>
+    </div>
+  </div>
+  <script>
+    (function(){
+      let payload = {};
+      function playSound(){
+        try {
+          const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+          const ctx = new AC();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(880, ctx.currentTime);
+          g.gain.setValueAtTime(0.0001, ctx.currentTime);
+          g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+          o.connect(g); g.connect(ctx.destination);
+          o.start(); o.stop(ctx.currentTime + 0.3);
+        } catch(e){}
+      }
+      function setData(d){
+        payload = d || {};
+        document.getElementById('senderName').textContent = d.sender_name || d.sender || 'Pengguna';
+        document.getElementById('messageText').textContent = d.message || '';
+        playSound();
+      }
+      document.getElementById('btnReply').addEventListener('click', function(){
+        try { window.api.openChatFromOverlay({ sender_id: payload.sender_id, room_id: payload.room_id }); } catch(e){}
+      });
+      document.getElementById('btnClose').addEventListener('click', function(){
+        try { window.api.closeChatOverlay(); } catch(e){}
+      });
+      try { window.api.onChatOverlayMessage(function(d){ setData(d); }); } catch(e) { setData({ sender_name:'Chat', message:'Pesan baru' }); }
+    })();
+  </script>
+</body>
+</html>

@@ -50,6 +50,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// import { setupChatUI } from './dashboard.js'; // HAPUS: tidak menggunakan ESM di renderer Electron
+
+function logLoginPresence(step, extra) {
+  try { console.log(`[presence][login] ${step}`, extra||''); } catch (e) {}
+}
+
+async function handleLoginSuccess(user) {
+  try {
+    localStorage.setItem('currentUser', JSON.stringify(user));
+    logLoginPresence('login success', { userId: user.id });
+    // Jangan panggil import ESM. Presence akan diinisialisasi otomatis saat Dashboard load.
+    // Redirect ke dashboard
+    window.location.href = 'dashboard.html';
+  } catch (e) {
+    console.error('handleLoginSuccess error', e);
+  }
+}
+
 async function initThemeByShift() {
   console.log('[login] initThemeByShift');
   try {

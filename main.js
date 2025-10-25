@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, screen } = require('electron');
 // Force-disable GPU compositing to avoid renderer crash on hover/focus
 app.commandLine.appendSwitch('disable-gpu');
 app.disableHardwareAcceleration();
@@ -33,6 +33,7 @@ const recoveryService = require(path.join(appRoot, 'src', 'services', 'recovery_
 
 // Keep a global reference of the window object to avoid garbage collection
 let mainWindow;
+let chatOverlayWindow = null;
 
 // Create the main application window
 function createWindow() {
@@ -146,6 +147,62 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+// Chat overlay IPC handlers
+function createChatOverlay(data) {
+  try {
+    if (chatOverlayWindow && !chatOverlayWindow.isDestroyed()) {
+      try { chatOverlayWindow.close(); } catch(e) {}
+      chatOverlayWindow = null;
+    }
+    const preloadPath = path.join(appRoot, 'preload.js');
+    const overlayHtmlPath = path.join(appRoot, 'src', 'views', 'chat_notify.html');
+    chatOverlayWindow = new BrowserWindow({
+      width: 360,
+      height: 180,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: preloadPath
+      }
+    });
+    chatOverlayWindow.loadFile(overlayHtmlPath);
+    try { chatOverlayWindow.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
+    try { chatOverlayWindow.setVisibleOnAllWorkspaces(true); } catch(e) {}
+    try { chatOverlayWindow.setFocusable(true); } catch(e) {}
+
+    chatOverlayWindow.once('ready-to-show', () => {
+      try {
+        const { workArea } = screen.getPrimaryDisplay();
+        const b = chatOverlayWindow.getBounds();
+        const x = workArea.x + workArea.width - b.width - 16;
+        const y = workArea.y + workArea.height - b.height - 16;
+        chatOverlayWindow.setPosition(x, y);
+        chatOverlayWindow.show();
+      } catch (e) { log.warn('position overlay error', e); }
+    });
+
+    chatOverlayWindow.webContents.on('did-finish-load', () => {
+      try { chatOverlayWindow.webContents.send('chat:overlay-message', data); } catch(e) { log.warn('send overlay payload error', e); }
+    });
+
+    chatOverlayWindow.on('closed', () => { chatOverlayWindow = null; });
+  } catch (err) {
+    log.warn('createChatOverlay error', err);
+  }
+}
+
+ipcMain.on('chat:notify', (_, data) => { createChatOverlay(data); });
+ipcMain.on('chat:overlay-close', () => { try { if (chatOverlayWindow && !chatOverlayWindow.isDestroyed()) chatOverlayWindow.close(); } catch (e) {} });
+ipcMain.on('chat:open-modal', (_, payload) => {
+  try { if (mainWindow) mainWindow.webContents.send('chat:open-modal', payload); } catch (e) {}
+  try { if (chatOverlayWindow && !chatOverlayWindow.isDestroyed()) chatOverlayWindow.close(); } catch (e) {}
 });
 
 // IPC handlers for authentication

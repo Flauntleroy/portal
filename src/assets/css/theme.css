@@ -156,3 +156,25 @@ body.theme-dark .table {
 body.theme-dark .admin-header {
   background: linear-gradient(135deg, #334155 0%, #1f2937 100%) !important; /* slate tones */
 }
+
+/* Floating Chat Bubble */
+.chat-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1040; /* above content, below offcanvas backdrop */
+}
+.chat-fab .badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
+  font-size: 10px;
+  padding: 4px 6px;
+}

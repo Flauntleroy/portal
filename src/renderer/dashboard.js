@@ -7,6 +7,12 @@ console.log('Dashboard.js script loaded');
 let currentUser = null;
 let currentSimrsLogId = null;
 
+// Chat presence globals
+const CHAT_BASE_URL = 'http://localhost:3002';
+let chatSocket = null;
+let chatPingInterval = null;
+let presenceListReceived = false;
+
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
   console.log('DOM Content Loaded - Dashboard');
@@ -41,6 +47,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadUnitKerjaData();
     loadShiftStatus();
     loadSimrsHistory();
+
+    // Setup Chat UI & presence
+    setupChatToggle();
   } catch (error) {
     console.error('Error loading user data:', error);
   }
@@ -260,6 +269,417 @@ function setupNavigation() {
   
   console.log('Navigation setup completed');
 }
+
+// Chat UI: toggle and presence
+function setupChatToggle() {
+  try {
+    const offcanvasEl = document.getElementById('chatOffcanvas');
+    const toggles = [
+      document.getElementById('toggle-chat-btn'),
+      document.getElementById('toggle-chat-fab'),
+    ].filter(Boolean);
+
+    if (!offcanvasEl || toggles.length === 0) return;
+
+    const offcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasEl);
+
+    toggles.forEach((btn) => {
+      if (btn.dataset.chatToggleInit === '1') return;
+      btn.dataset.chatToggleInit = '1';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        offcanvas.show();
+        const userId = window?.CURRENT_USER?.id || window?.USER_ID;
+        if (userId) initChatPresence(userId);
+      });
+    });
+  } catch (err) {
+    console.error('setupChatToggle error:', err);
+  }
+}
+
+
+async function ensureSocketIoClient() {
+  if (window.io) return true;
+  const candidateUrls = [
+    `${CHAT_BASE_URL}/socket.io/socket.io.js`,
+    'https://cdn.socket.io/4.7.2/socket.io.min.js'
+  ];
+  for (const url of candidateUrls) {
+    try {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = url;
+        s.async = true;
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+      if (window.io) return true;
+    } catch (e) {
+      console.warn('[chat] gagal load socket.io', url, e);
+    }
+  }
+  return !!window.io;
+}
+
+function logPresence(step, extra) {
+  try { console.log(`[presence][client] ${step}`, extra || ''); } catch (e) {}
+}
+
+// Chat popup caches
+const chatPopupsByRoomId = {};
+const chatPopupsByUserId = {};
+const userCacheById = {};
+
+// Bind IPC dari main untuk membuka modal saat klik "Balas" di overlay
+try {
+  if (window.api && !window._chatIpcBinded) {
+    window.api.onChatOpenModal(async (payload) => {
+      try {
+        const peer = await resolveUserById(payload.sender_id);
+        if (peer) openChatPopup(peer);
+      } catch (e) { console.warn('open-modal IPC error', e); }
+    });
+    window._chatIpcBinded = true;
+  }
+} catch (e) {}
+
+function getCurrentUserId() {
+  try { return window?.CURRENT_USER?.id || window?.USER_ID || JSON.parse(localStorage.getItem('currentUser')||'{}').id; } catch { return null; }
+}
+
+function resolveUserById(userId) {
+  if (userCacheById[userId]) return Promise.resolve(userCacheById[userId]);
+  // Try fetch online-users first
+  return fetch(`${CHAT_BASE_URL}/api/online-users`)
+    .then(r => r.json())
+    .then(list => {
+      const found = Array.isArray(list) ? list.find(u => String(u.id) === String(userId)) : null;
+      if (found) { userCacheById[userId] = found; return found; }
+      // Fallback to contacts
+      const me = getCurrentUserId();
+      if (!me) return null;
+      return fetch(`${CHAT_BASE_URL}/api/contacts?user_id=${me}`)
+        .then(r => r.json())
+        .then(cs => {
+          const f = Array.isArray(cs) ? cs.find(u => String(u.id) === String(userId)) : null;
+          if (f) userCacheById[userId] = f;
+          return f;
+        });
+    })
+    .catch(() => null);
+}
+
+function createChatModal(peer) {
+  const mid = `chatModal-${peer.id}`;
+  let el = document.getElementById(mid);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = mid;
+    el.className = 'modal fade';
+    el.innerHTML = `
+      <div class="modal-dialog modal-md modal-dialog-end">
+        <div class="modal-content" style="border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);">
+          <div class="modal-header py-2" style="background:#1a8e83;color:#fff;">
+            <h6 class="modal-title"><i class="fas fa-user me-2"></i>${peer.full_name || peer.username || 'Pengguna'}</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" style="max-height: 360px; overflow-y: auto; background:#f8fafc;">
+            <div class="chat-mini-messages"></div>
+          </div>
+          <div class="modal-footer py-2">
+            <div class="input-group input-group-sm">
+              <input type="text" class="form-control chat-mini-input" placeholder="Tulis pesan…" />
+              <button class="btn btn-primary chat-mini-send" type="button"><i class="fas fa-paper-plane"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
+  }
+  const modal = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
+  const handle = {
+    el,
+    modal,
+    peer,
+    roomId: null,
+    listEl: el.querySelector('.chat-mini-messages'),
+    inputEl: el.querySelector('.chat-mini-input'),
+    sendBtn: el.querySelector('.chat-mini-send')
+  };
+  handle.sendBtn.addEventListener('click', () => sendMessageFromHandle(handle));
+  handle.inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessageFromHandle(handle); });
+  return handle;
+}
+
+function renderMessageBubble(m, meId) {
+  const div = document.createElement('div');
+  const mine = String(m.sender_id) === String(meId);
+  div.className = `message ${mine ? 'me' : 'other'}`;
+  div.style.padding = '6px 8px';
+  div.style.borderRadius = '6px';
+  div.style.marginBottom = '8px';
+  div.style.background = mine ? '#e7f1ff' : '#f7f7f7';
+  div.textContent = m.message;
+  return div;
+}
+
+async function loadMessagesIntoHandle(handle, rid) {
+  try {
+    const r = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}`);
+    const data = await r.json();
+    handle.listEl.innerHTML = '';
+    const meId = getCurrentUserId();
+    data.forEach(m => { handle.listEl.appendChild(renderMessageBubble(m, meId)); });
+    handle.listEl.scrollTop = handle.listEl.scrollHeight;
+  } catch (e) { console.warn('loadMessagesIntoHandle error', e); }
+}
+
+function appendMessageToHandle(handle, m) {
+  const meId = getCurrentUserId();
+  handle.listEl.appendChild(renderMessageBubble(m, meId));
+  handle.listEl.scrollTop = handle.listEl.scrollHeight;
+}
+
+async function sendMessageFromHandle(handle) {
+  const t = (handle.inputEl.value || '').trim();
+  if (!t) return;
+  const meId = getCurrentUserId();
+  const payload = { sender_id: meId, message: t, message_type: 'text' };
+  if (handle.roomId) {
+    payload.room_id = handle.roomId;
+  } else {
+    payload.recipient_id = handle.peer.id;
+  }
+  try {
+    const r = await fetch(`${CHAT_BASE_URL}/api/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await r.json();
+    if (data?.data?.room_id && !handle.roomId) {
+      handle.roomId = data.data.room_id;
+      chatPopupsByRoomId[handle.roomId] = handle;
+      if (window._chatSocket) window._chatSocket.emit('room:join', { room_id: handle.roomId });
+    }
+    handle.inputEl.value = '';
+  } catch (e) { console.warn('sendMessage error', e); }
+}
+
+function openChatPopup(peer) {
+  const meId = getCurrentUserId();
+  if (!meId || !peer?.id) return;
+  let handle = chatPopupsByUserId[peer.id];
+  if (!handle) {
+    handle = createChatModal(peer);
+    chatPopupsByUserId[peer.id] = handle;
+  }
+  handle.modal.show();
+  fetch(`${CHAT_BASE_URL}/api/direct-room?user_id=${meId}&peer_id=${peer.id}`)
+    .then(r => r.json())
+    .then(room => {
+      handle.roomId = room.id;
+      chatPopupsByRoomId[room.id] = handle;
+      if (window._chatSocket) window._chatSocket.emit('room:join', { room_id: room.id });
+      return loadMessagesIntoHandle(handle, room.id);
+    })
+    .catch(e => console.warn('direct-room error', e));
+}
+
+function startChatWithUser(user) { openChatPopup(user); }
+
+async function initChatPresence(userId) {
+  logPresence('initChatPresence start', { userId });
+  if (!window.io) {
+    console.warn('socket.io client belum tersedia');
+    return;
+  }
+  if (chatSocket && chatSocket.connected) {
+    logPresence('socket already connected, skip init');
+    return;
+  }
+  const socket = window.io(CHAT_BASE_URL, { transports: ['websocket'], reconnection: true });
+  window._chatSocket = socket;
+  chatSocket = socket;
+
+  const statusEl = document.getElementById('chat-conn-status');
+
+  socket.on('connect', () => {
+    logPresence('socket connected', { id: socket.id });
+    if (statusEl) statusEl.textContent = 'Terhubung';
+    socket.emit('auth', { user_id: userId });
+    socket.emit('presence:ping', (ts) => {
+      logPresence('presence:ping ack', { ts });
+      if (typeof ts === 'number' && statusEl) {
+        const latency = Math.max(0, Date.now() - ts);
+        statusEl.textContent = 'Terhubung · ' + latency + 'ms';
+      }
+    });
+  });
+
+  // NEW: handle incoming messages to show popup automatically
+  if (!socket._chatMessageHandlerInstalled) {
+    socket.on('chat:new_message', async (m) => {
+      try {
+        let handle = chatPopupsByRoomId[m.room_id];
+        if (!handle) {
+          const peer = await resolveUserById(m.sender_id);
+          if (peer) {
+            try {
+              if (window.api && typeof window.api.notifyChat === 'function') {
+                window.api.notifyChat({
+                  sender_id: m.sender_id,
+                  sender_name: peer.full_name || peer.username || 'Pengguna',
+                  room_id: m.room_id,
+                  message: m.message
+                });
+              }
+            } catch (e) {}
+            // Tidak membuka modal otomatis; user klik "Balas" dari overlay
+          }
+        } else {
+          appendMessageToHandle(handle, m);
+        }
+      } catch (e) { console.warn('chat:new_message handler error', e); }
+    });
+    socket._chatMessageHandlerInstalled = true;
+  }
+
+  socket.on('presence:list', (list) => {
+    presenceListReceived = true;
+    logPresence('presence:list', { count: (list||[]).length });
+    refreshOnlineUsersFromPresenceList(list, userId);
+  });
+
+  socket.on('disconnect', (reason) => {
+    logPresence('socket disconnected', { reason });
+    if (statusEl) statusEl.textContent = 'Terputus';
+  });
+
+  // Ping berkala untuk menjaga last_active dan latency
+  const ping = () => {
+    try {
+      socket.emit('presence:ping', (serverTs) => {
+        if (typeof serverTs === 'number' && statusEl) {
+          const latency = Math.max(0, Date.now() - serverTs);
+          statusEl.textContent = 'Terhubung · ' + latency + 'ms';
+        }
+      });
+    } catch (e) {}
+  };
+  try { ping(); } catch (e) {}
+  window._chatPingInterval = setInterval(ping, 5000);
+}
+
+async function refreshOnlineUsersFromAPI(currentUserId) {
+  try {
+    const res = await fetch(`${CHAT_BASE_URL}/api/online-users?exclude_id=${encodeURIComponent(currentUserId)}`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const data = await res.json();
+    logPresence('refreshOnlineUsersFromAPI', { count: (data||[]).length });
+    renderOnlineUsers(data);
+  } catch (e) {
+    console.warn('gagal fetch online-users, fallback ke contacts', e);
+    try {
+      const r = await fetch(`${CHAT_BASE_URL}/api/contacts?user_id=${encodeURIComponent(currentUserId)}`);
+      const contacts = await r.json();
+      const onlineOnly = (contacts || []).filter(c => c.online && c.id !== currentUserId);
+      renderOnlineUsers(onlineOnly);
+    } catch (err) {
+      console.warn('gagal fetch contacts fallback', err);
+      renderOnlineUsers([]);
+    }
+  }
+}
+
+async function refreshOnlineUsersFromPresenceList(list, currentUserId) {
+  try {
+    const set = new Set((list || []).map(x => x.user_id));
+    set.delete(currentUserId);
+
+    // Ambil data authoritative dari API online-users
+    const res = await fetch(`${CHAT_BASE_URL}/api/online-users?exclude_id=${encodeURIComponent(currentUserId)}`);
+    const apiList = await res.json();
+
+    // Filter berdasarkan presence set jika ada
+    let items = Array.isArray(apiList) ? apiList.filter(u => set.size ? set.has(u.id) : true) : [];
+
+    // Jika presence tiba-tiba kosong tapi API masih ada data, pakai API agar tidak menghapus daftar secara sementara
+    if ((!items || items.length === 0) && Array.isArray(apiList) && apiList.length > 0 && set.size === 0) {
+      items = apiList;
+    }
+
+    logPresence('refreshFromPresenceList+api', { presence_count: set.size, api_count: (apiList||[]).length, final: (items||[]).length });
+    renderOnlineUsers(items);
+  } catch (e) {
+    console.warn('refreshFromPresenceList error', e);
+  }
+}
+
+function renderOnlineUsers(list) {
+  const container = document.getElementById('online-users-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // cache list
+  window._onlineUsersList = Array.isArray(list) ? list : [];
+  window._onlineUsersById = {}; (window._onlineUsersList || []).forEach(u => { window._onlineUsersById[u.id] = u; userCacheById[u.id] = u; });
+
+  if (!Array.isArray(list) || list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'text-muted';
+    empty.textContent = 'Belum ada user online.';
+    container.appendChild(empty);
+  } else {
+    list.forEach((u) => {
+      const item = document.createElement('div');
+      item.className = 'list-group-item d-flex align-items-center justify-content-between';
+      item.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-success rounded-pill">•</span>
+          <strong>${u.full_name || u.username || u.name}</strong>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <small class="text-muted">${u.unit_kerja || '-'}</small>
+          <button class="btn btn-sm btn-outline-primary chat-start-btn" title="Chat" data-user-id="${u.id}"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      `;
+      container.appendChild(item);
+      const btn = item.querySelector('.chat-start-btn');
+      if (btn) btn.addEventListener('click', () => startChatWithUser(u));
+    });
+  }
+
+  const countEl = document.getElementById('chat-online-count');
+  if (countEl) countEl.textContent = String(list?.length || 0);
+  const fabBadge = document.getElementById('chat-fab-badge');
+  if (fabBadge) fabBadge.textContent = String(list?.length || 0);
+}
+
+async function setupChatPresence(user) {
+  const userId = user?.id;
+  logPresence('setupChatPresence', { userId });
+  await ensureSocketIoClient();
+  if (userId) {
+    await initChatPresence(userId);
+    setTimeout(() => {
+      if (!presenceListReceived) {
+        refreshOnlineUsersFromAPI(userId);
+      }
+    }, 1500);
+  }
+}
+
+// Inisialisasi otomatis saat halaman Dashboard dimuat
+try {
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('currentUser') || 'null');
+      // Pastikan tombol Chat bisa toggle offcanvas
+      setupChatToggle();
+      if (user && user.id) await setupChatPresence(user);
+    } catch (e) { console.warn('[presence] init on load error', e); }
+  });
+} catch (e) {}
 
 // Show specific section and hide others
 function showSection(sectionName) {
@@ -903,6 +1323,10 @@ async function logout() {
     // Hapus data user dari localStorage dengan aman
     localStorage.removeItem('currentUser');
     localStorage.removeItem('activeSimrsLogId');
+
+    // Disconnect chat socket if any
+    try { if (chatSocket) { chatSocket.close(); chatSocket = null; } } catch (e) {}
+    if (chatPingInterval) { clearInterval(chatPingInterval); chatPingInterval = null; }
 
     // Redirect ke halaman login
     window.location.href = 'login.html';

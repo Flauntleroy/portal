@@ -32,7 +32,12 @@ const modelFiles = [
   'login_attempt.js',
   'simrs_usage.js',
   'shift_log.js',
-  'shift_schedule.js'
+  'shift_schedule.js',
+  'chat_room.js',
+  'chat_participant.js',
+  'chat_message.js',
+  'chat_message_read.js',
+  'online_user.js'
 ];
 
 // Load models
