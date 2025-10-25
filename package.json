@@ -34,15 +34,29 @@
     },
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
       ],
-      "icon": "assets/icons/win/icon.ico"
+      "requestedExecutionLevel": "asInvoker"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "extraMetadata": {
+      "main": "main.js"
+    },
+    "files": [
+      "**/*"
+    ],
+    "asar": false,
+    "compression": "normal",
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false,
+    "forceCodeSigning": false,
+    "electronDownload": {
+      "cache": "./electron-cache"
     }
   }
 }

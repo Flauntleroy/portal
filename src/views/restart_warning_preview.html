@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Preview Peringatan Restart</title>
+  <style>
+    body {font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:20px; background: linear-gradient(135deg,#667eea 0%, #764ba2 100%); color:#fff; text-align:center;}
+    .container {background: rgba(255,255,255,0.1); border-radius:10px; padding:30px; backdrop-filter: blur(10px);} 
+    .icon {font-size:48px; margin-bottom:20px;}
+    .countdown {font-size:36px; font-weight:bold; margin:20px 0; color:#ffeb3b;}
+    .buttons {margin-top:30px;}
+    button {padding:10px 20px; margin:0 10px; border:none; border-radius:5px; cursor:pointer; font-size:14px; font-weight:bold;}
+    .postpone { background:#ff9800; color:#fff; }
+    .cancel { background:#f44336; color:#fff; }
+    .restart { background:#4caf50; color:#fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">⚠️</div>
+    <h2>Aplikasi Akan Restart</h2>
+    <p>Shift kerja akan berakhir dan aplikasi perlu direstart untuk pergantian shift.</p>
+    <div class="countdown" id="countdown">02:00</div>
+    <p>Pastikan semua pekerjaan telah disimpan!</p>
+    <div class="buttons">
+      <button class="postpone" onclick="postponeRestart()">Tunda 10 Menit</button>
+      <button class="cancel" onclick="cancelRestart()">Batal</button>
+      <button class="restart" onclick="restartNow()">Restart Sekarang</button>
+    </div>
+  </div>
+  <script>
+    let countdownSeconds = 120; // preview default 2 menit
+    function updateCountdown(){
+      const m = Math.floor(countdownSeconds/60); const s = countdownSeconds%60;
+      document.getElementById('countdown').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      if(countdownSeconds>0){ countdownSeconds--; }
+    }
+    setInterval(updateCountdown,1000); updateCountdown();
+    function postponeRestart(){ console.log('Preview: postpone 10 minutes'); countdownSeconds += 600; }
+    function cancelRestart(){ console.log('Preview: cancel restart'); }
+    function restartNow(){ console.log('Preview: restart now'); }
+  </script>
+</body>
+</html>

@@ -1,4 +1,12 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+// Force-disable GPU compositing to avoid renderer crash on hover/focus
+app.commandLine.appendSwitch('disable-gpu');
+app.disableHardwareAcceleration();
+// Apply extra safety in packaged builds
+if (app.isPackaged) {
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+  app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,AcceleratedPaint');
+}
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -9,37 +17,67 @@ const { Op } = require('sequelize');
 log.transports.file.level = 'info';
 log.info('Application starting...');
 
-// Database models
-const db = require('./src/models');
+// Resolve app root for production build (resources/app) or dev (__dirname)
+const appRoot = fs.existsSync(path.join(process.resourcesPath || '', 'app'))
+  ? path.join(process.resourcesPath, 'app')
+  : __dirname;
 
-// Shift service
-const shiftService = require('./src/services/shift_service');
+// Database models
+const db = require(path.join(appRoot, 'src', 'models'));
+
+// Services
+const shiftService = require(path.join(appRoot, 'src', 'services', 'shift_service'));
+const autoRestartService = require(path.join(appRoot, 'src', 'services', 'auto_restart_service'));
+const recoveryService = require(path.join(appRoot, 'src', 'services', 'recovery_service'));
 
 // Keep a global reference of the window object to avoid garbage collection
 let mainWindow;
 
 // Create the main application window
 function createWindow() {
+  const preloadPath = path.join(appRoot, 'preload.js');
+  const loginHtmlPath = path.join(appRoot, 'src', 'views', 'login.html');
+  log.info(`Resolved preload path: ${preloadPath} exists=${fs.existsSync(preloadPath)}`);
+  log.info(`Resolved login.html path: ${loginHtmlPath} exists=${fs.existsSync(loginHtmlPath)}`);
+
   mainWindow = new BrowserWindow({
     width: 1024,
     height: 768,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: preloadPath
     },
-    icon: path.join(__dirname, 'assets/icons/win/icon.ico')
+    icon: path.join(appRoot, 'assets', 'icons', 'win', 'icon.ico')
   });
 
   // Load the index.html file
-  mainWindow.loadFile('src/views/login.html');
+  mainWindow.loadFile(loginHtmlPath);
 
-  // Open DevTools in development mode
+  mainWindow.webContents.on('dom-ready', () => {
+    log.info('DOM ready for main window');
+  });
+
+  // Diagnostics
+  mainWindow.webContents.on('did-finish-load', () => {
+    log.info('Main window finished load');
+  });
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    log.error(`Main window failed to load: code=${errorCode} desc=${errorDescription} url=${validatedURL} mainFrame=${isMainFrame}`);
+  });
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    try {
+      log.info(`Renderer console [${level}]: ${message} (${sourceId}:${line})`);
+    } catch (e) {}
+  });
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    log.error('Renderer process gone:', details);
+  });
+
   if (process.argv.includes('--dev')) {
     mainWindow.webContents.openDevTools();
   }
 
-  // Handle window closed event
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -52,9 +90,20 @@ app.whenReady().then(async () => {
     await db.sequelize.sync();
     log.info('Database connected successfully');
 
+    // Initialize recovery service first
+    await recoveryService.initialize();
+    log.info('Recovery service initialized');
+
+    // Setup IPC handlers for auto-restart service
+    autoRestartService.setupIpcHandlers();
+
     // Start shift monitoring service
     shiftService.startShiftMonitoring(1); // Check every 1 minute
     log.info('Shift monitoring service started');
+
+    // Start auto-restart monitoring service
+    await autoRestartService.startMonitoring();
+    log.info('Auto-restart monitoring service started');
 
     createWindow();
   } catch (error) {
@@ -70,6 +119,10 @@ app.whenReady().then(async () => {
 // Sessions should only be closed when user explicitly logs out
 app.on('before-quit', async () => {
   try {
+    // Stop auto-restart monitoring service
+    autoRestartService.stopMonitoring();
+    log.info('Auto-restart monitoring service stopped');
+    
     // Stop shift monitoring service
     shiftService.stopShiftMonitoring();
     log.info('Shift monitoring service stopped');
@@ -681,6 +734,36 @@ ipcMain.handle('get-all-shifts', async () => {
   }
 });
 
+// New: Update shift schedule (admin)
+ipcMain.handle('update-shift-schedule', async (_, schedule) => {
+  try {
+    const { shift_name, start_time, end_time, is_overnight } = schedule || {};
+    if (!shift_name || !start_time || !end_time) {
+      return { success: false, message: 'Data jadwal tidak lengkap' };
+    }
+
+    const shift = await db.ShiftSchedule.findOne({ where: { shift_name } });
+    if (!shift) {
+      return { success: false, message: 'Shift tidak ditemukan' };
+    }
+
+    const start = start_time.length === 8 ? start_time : `${start_time}:00`;
+    const end = end_time.length === 8 ? end_time : `${end_time}:00`;
+
+    await shift.update({
+      start_time: start,
+      end_time: end,
+      is_overnight: !!is_overnight
+    });
+
+    log.info(`Shift ${shift_name} diubah: ${start} - ${end}, overnight=${!!is_overnight}`);
+    return { success: true };
+  } catch (error) {
+    log.error('Error updating shift schedule:', error);
+    return { success: false, message: error.message };
+  }
+});
+
 // IPC handler for getting all units with shift configuration (for admin page)
 ipcMain.handle('get-all-units-with-shift-config', async () => {
   try {
@@ -714,6 +797,36 @@ ipcMain.handle('update-unit-shift-config-admin', async (_, unitConfig) => {
     return { success: true, message: 'Konfigurasi shift berhasil diperbarui' };
   } catch (error) {
     log.error('Error updating unit shift config:', error);
+    return { success: false, message: error.message };
+  }
+});
+
+// IPC handlers for recovery service
+ipcMain.handle('recovery:get-available-backups', async () => {
+  try {
+    return await recoveryService.getAvailableBackups();
+  } catch (error) {
+    log.error('Error getting available backups:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('recovery:manual-recovery', async (_, backupFile) => {
+  try {
+    await recoveryService.manualRecovery(backupFile);
+    return { success: true, message: 'Recovery berhasil dilakukan' };
+  } catch (error) {
+    log.error('Error manual recovery:', error);
+    return { success: false, message: error.message };
+  }
+});
+
+ipcMain.handle('recovery:cleanup-old-backups', async () => {
+  try {
+    await recoveryService.cleanupOldBackups();
+    return { success: true, message: 'Backup lama berhasil dibersihkan' };
+  } catch (error) {
+    log.error('Error cleanup old backups:', error);
     return { success: false, message: error.message };
   }
 });

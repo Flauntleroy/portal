@@ -1,0 +1,61 @@
+{
+  "autoRestart": {
+    "enabled": true,
+    "warningMinutes": 5,
+    "checkIntervalSeconds": 30,
+    "gracePeriodMinutes": 2,
+    "maxPostponeMinutes": 30,
+    "backupRetentionDays": 7
+  },
+  "shiftSchedules": {
+    "pagi": {
+      "startTime": "08:00",
+      "endTime": "16:30",
+      "restartOffset": 0
+    },
+    "siang": {
+      "startTime": "16:30", 
+      "endTime": "00:00",
+      "restartOffset": 0
+    },
+    "malam": {
+      "startTime": "00:00",
+      "endTime": "08:00", 
+      "restartOffset": 0
+    }
+  },
+  "notifications": {
+    "showWarningDialog": true,
+    "playSound": true,
+    "soundFile": "warning.wav",
+    "allowPostpone": true,
+    "allowCancel": false,
+    "countdownDisplay": true
+  },
+  "backup": {
+    "enabled": true,
+    "includeSessions": true,
+    "includeUserData": true,
+    "includeSettings": true,
+    "compressionEnabled": false
+  },
+  "recovery": {
+    "autoRecoverSessions": true,
+    "restoreWindowState": true,
+    "restoreUserPreferences": true,
+    "showRecoveryDialog": true
+  },
+  "errorHandling": {
+    "maxRetries": 3,
+    "retryDelaySeconds": 5,
+    "fallbackToManualRestart": true,
+    "logLevel": "info",
+    "notifyOnError": true
+  },
+  "maintenance": {
+    "cleanupOldBackups": true,
+    "cleanupOldLogs": true,
+    "optimizeDatabase": false,
+    "runMaintenanceOnRestart": true
+  }
+}

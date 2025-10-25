@@ -5,7 +5,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Check if user has admin access
     await checkAdminAccess();
     await loadUnitsData();
+    await loadShiftSchedules();
     setupEventListeners();
+    setupShiftScheduleListeners();
 });
 
 async function checkAdminAccess() {
@@ -377,5 +379,75 @@ function goBack() {
         }
     } else {
         window.history.back();
+    }
+}
+
+async function loadShiftSchedules() {
+    try {
+        const schedules = await window.api.getAllShifts();
+        // Expect array of schedules: { id, shift_name, start_time, end_time, is_overnight }
+        const pagi = schedules.find(s => (s.shift_name || s.name) === 'pagi');
+        const malam = schedules.find(s => (s.shift_name || s.name) === 'malam');
+
+        if (pagi) {
+            document.getElementById('shift-pagi-start').value = (pagi.start_time || '').slice(0,5);
+            document.getElementById('shift-pagi-end').value = (pagi.end_time || '').slice(0,5);
+        }
+        if (malam) {
+            document.getElementById('shift-malam-start').value = (malam.start_time || '').slice(0,5);
+            document.getElementById('shift-malam-end').value = (malam.end_time || '').slice(0,5);
+            const overnight = malam.is_overnight ?? malam.overnight ?? false;
+            document.getElementById('shift-malam-overnight').checked = !!overnight;
+        }
+    } catch (error) {
+        console.error('Error loading shift schedules:', error);
+        showAlert('danger', 'Gagal memuat jadwal shift');
+    }
+}
+
+function setupShiftScheduleListeners() {
+    const btn = document.getElementById('save-shift-schedule-btn');
+    if (!btn) return;
+    btn.addEventListener('click', saveShiftSchedules);
+}
+
+async function saveShiftSchedules() {
+    try {
+        const pagiStart = document.getElementById('shift-pagi-start').value;
+        const pagiEnd = document.getElementById('shift-pagi-end').value;
+        const malamStart = document.getElementById('shift-malam-start').value;
+        const malamEnd = document.getElementById('shift-malam-end').value;
+        const malamOvernight = document.getElementById('shift-malam-overnight').checked;
+
+        if (!pagiStart || !pagiEnd || !malamStart || !malamEnd) {
+            showAlert('warning', 'Lengkapi semua jam shift sebelum menyimpan.');
+            return;
+        }
+
+        showAlert('info', 'Menyimpan jadwal shift...');
+
+        const pagiRes = await window.api.updateShiftSchedule({
+            shift_name: 'pagi',
+            start_time: pagiStart,
+            end_time: pagiEnd,
+            is_overnight: false
+        });
+
+        const malamRes = await window.api.updateShiftSchedule({
+            shift_name: 'malam',
+            start_time: malamStart,
+            end_time: malamEnd,
+            is_overnight: malamOvernight
+        });
+
+        if ((pagiRes && pagiRes.success) && (malamRes && malamRes.success)) {
+            showAlert('success', 'Jadwal shift berhasil disimpan.');
+        } else {
+            const msg = (pagiRes && pagiRes.message) || (malamRes && malamRes.message) || 'Tidak diketahui';
+            showAlert('danger', 'Gagal menyimpan jadwal shift: ' + msg);
+        }
+    } catch (error) {
+        console.error('Error saving shift schedules:', error);
+        showAlert('danger', 'Terjadi kesalahan saat menyimpan jadwal shift: ' + error.message);
     }
 }
