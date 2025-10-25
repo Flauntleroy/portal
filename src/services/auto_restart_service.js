@@ -17,7 +17,8 @@ class AutoRestartService {
       checkIntervalSeconds: 30, // Cek setiap 30 detik
       backupPath: path.join(app.getPath('userData'), 'backup'),
       enableAutoRestart: true,
-      gracePeriodMinutes: 2 // Grace period untuk operasi yang sedang berjalan
+      gracePeriodMinutes: 1, // Grace period minimum 1 menit
+      restartDelaySeconds: 60 // Restart terjadi 1 menit setelah end_time
     };
     this.pendingRestart = false;
     this.countdownSeconds = 0;
@@ -123,21 +124,21 @@ class AutoRestartService {
         return;
       }
 
-      // Jika sudah melewati waktu berakhir shift, tampilkan warning dengan grace period
+      // Jika sudah melewati waktu berakhir shift, tampilkan warning dengan delay 1 menit
       if (timeUntilEnd <= 0 && !this.pendingRestart) {
-        log.info('Waktu shift telah berakhir, menampilkan peringatan dengan grace period');
-        await this.showRestartWarning(0, shiftEndTime);
+        log.info('Waktu shift telah berakhir, menampilkan peringatan dengan delay 1 menit');
         this.pendingShiftName = currentShift.shift_name;
         this.pendingShiftEndTime = shiftEndTime;
+        await this.showRestartWarning(0, shiftEndTime);
         return;
       }
 
       // Jika mendekati waktu berakhir shift dan belum ada peringatan
       if (minutesUntilEnd <= this.config.warningMinutes && !this.pendingRestart) {
         log.info(`Shift akan berakhir dalam ${minutesUntilEnd} menit, menampilkan peringatan`);
-        await this.showRestartWarning(minutesUntilEnd, shiftEndTime);
         this.pendingShiftName = currentShift.shift_name;
         this.pendingShiftEndTime = shiftEndTime;
+        await this.showRestartWarning(minutesUntilEnd, shiftEndTime);
       }
 
     } catch (error) {
@@ -169,9 +170,12 @@ class AutoRestartService {
    */
   async showRestartWarning(minutesUntilEnd, shiftEndTime) {
     this.pendingRestart = true;
-    // Clamp countdown with grace period minimum
-    const minGrace = (this.config.gracePeriodMinutes || 2) * 60;
-    this.countdownSeconds = Math.max((minutesUntilEnd || 0) * 60, minGrace);
+    const now = new Date();
+    const delaySec = this.config.restartDelaySeconds || 60;
+    const targetRestartTime = new Date(shiftEndTime.getTime() + delaySec * 1000);
+    const secondsUntilTarget = Math.max(Math.ceil((targetRestartTime.getTime() - now.getTime()) / 1000), 0);
+    // Countdown diarahkan ke (end_time + delay)
+    this.countdownSeconds = secondsUntilTarget;
 
     // Buat window peringatan
     await this.createWarningWindow();
@@ -374,7 +378,12 @@ class AutoRestartService {
         this.restartCountdownTimer = null;
         return;
       }
-      this.countdownSeconds--;
+      const delaySec = this.config.restartDelaySeconds || 60;
+      const baseEndTime = this.pendingShiftEndTime || shiftEndTime;
+      const targetRestartTime = new Date(baseEndTime.getTime() + delaySec * 1000);
+      const now = new Date();
+      const secondsUntilTarget = Math.ceil((targetRestartTime.getTime() - now.getTime()) / 1000);
+      this.countdownSeconds = Math.max(secondsUntilTarget, 0);
 
       if (this.countdownSeconds <= 0) {
         clearInterval(this.restartCountdownTimer);

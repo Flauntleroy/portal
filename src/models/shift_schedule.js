@@ -42,24 +42,33 @@ module.exports = (sequelize) => {
     updatedAt: 'updated_at'
   });
 
+  // Helper untuk membandingkan waktu HH:MM:SS sebagai Date pada epoch tetap
+  const toDate = (timeStr) => new Date(`1970-01-01T${timeStr}`);
+
   // Static method untuk mendapatkan shift aktif berdasarkan waktu
   ShiftSchedule.getCurrentShift = async function() {
     const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 8); // Format HH:MM:SS
+    const currentTimeStr = now.toTimeString().slice(0, 8); // Format HH:MM:SS
+    const current = toDate(currentTimeStr);
     
     const shifts = await this.findAll({
       order: [['start_time', 'ASC']]
     });
 
     for (const shift of shifts) {
-      if (shift.is_overnight) {
-        // Untuk shift malam yang melewati tengah malam
-        if (currentTime >= shift.start_time || currentTime < shift.end_time) {
+      const start = toDate(shift.start_time);
+      const end = toDate(shift.end_time);
+      // Deteksi overnight otomatis berbasis nilai start/end
+      const isOvernight = start > end; // contoh: 20:00 ke 06:00
+
+      if (isOvernight) {
+        // Jika melewati tengah malam: waktu aktif bila current >= start OR current < end
+        if (current >= start || current < end) {
           return shift;
         }
       } else {
-        // Untuk shift pagi yang tidak melewati tengah malam
-        if (currentTime >= shift.start_time && currentTime < shift.end_time) {
+        // Normal: current berada di [start, end)
+        if (current >= start && current < end) {
           return shift;
         }
       }
@@ -72,16 +81,14 @@ module.exports = (sequelize) => {
   // Static method untuk cek apakah sedang dalam periode pergantian shift
   ShiftSchedule.isShiftChangeTime = async function(toleranceMinutes = 5) {
     const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 8);
+    const currentTimeStr = now.toTimeString().slice(0, 8);
+    const current = toDate(currentTimeStr);
     
     const shifts = await this.findAll();
     
     for (const shift of shifts) {
-      const shiftStart = new Date(`1970-01-01T${shift.start_time}`);
-      const currentDateTime = new Date(`1970-01-01T${currentTime}`);
-      
-      // Hitung selisih waktu dalam menit
-      const diffMinutes = Math.abs((currentDateTime - shiftStart) / (1000 * 60));
+      const start = toDate(shift.start_time);
+      const diffMinutes = Math.abs((current - start) / (1000 * 60));
       
       if (diffMinutes <= toleranceMinutes) {
         return {
