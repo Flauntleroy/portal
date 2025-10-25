@@ -1,7 +1,7 @@
 {
-  "name": "siwasta-desktop",
-  "version": "1.0.0",
-  "description": "SIWASTA Desktop Application",
+  "name": "Portal-RSHAA",
+  "version": "2.0.0",
+  "description": "Portal SIMRS",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -9,7 +9,7 @@
     "build": "electron-builder",
     "postinstall": "electron-builder install-app-deps"
   },
-  "author": "SIWASTA Team",
+  "author": "IT R",
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.1.0",
@@ -28,7 +28,7 @@
   },
   "build": {
     "appId": "com.siwasta.desktop",
-    "productName": "SIWASTA Desktop",
+    "productName": "Portal-RSHAA",
     "directories": {
       "output": "dist"
     },
@@ -39,6 +39,7 @@
           "arch": ["x64"]
         }
       ],
+      "icon": "uploads/Icon-IT.ico",      
       "requestedExecutionLevel": "asInvoker"
     },
     "portable": {
