@@ -377,6 +377,30 @@ ipcMain.handle('close-simrs', async (_, logId) => {
   }
 });
 
+// Tambahan: handler untuk menutup semua sesi aktif milik user saat logout
+ipcMain.handle('close-all-simrs-for-user', async (_, userId) => {
+  try {
+    const activeSessions = await db.SimrsUsage.findAll({
+      where: { user_id: userId, status: 'active' }
+    });
+
+    for (const session of activeSessions) {
+      session.end_time = new Date();
+      session.status = 'closed';
+      session.notes = (session.notes ? session.notes + ' | ' : '') + 'Ditutup karena logout user';
+      await session.save();
+    }
+
+    return {
+      success: true,
+      closed_count: activeSessions.length
+    };
+  } catch (error) {
+    log.error('Error closing all SIMRS sessions for user:', error);
+    return { success: false, message: 'Terjadi kesalahan saat menutup semua sesi SIMRS user' };
+  }
+});
+
 // IPC handler for updating user profile
 ipcMain.handle('update-profile', async (_, userData) => {
   try {

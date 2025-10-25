@@ -34,25 +34,19 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         } else {
           // Fallback for non-Electron preview
-          console.warn('[login] window.api.login not available');
-          showAlert('info', 'Preview mode: simulasi login berhasil.');
+          const ok = username && password;
+          if (ok) {
+            localStorage.setItem('currentUser', JSON.stringify({ username }));
+            window.location.href = 'dashboard.html';
+          } else {
+            showAlert('danger', 'Masukkan username dan password.');
+          }
         }
       } catch (error) {
         console.error('Login error:', error);
-        showAlert('danger', 'Terjadi kesalahan saat login. Silakan coba lagi.');
+        showAlert('danger', 'Terjadi kesalahan saat login.');
       }
     });
-  } else {
-    console.warn('[login] form element not found');
-  }
-
-  function showAlert(type, message) {
-    alertContainer.innerHTML = `
-      <div class="alert alert-${type} alert-dismissible fade show" role="alert">
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    `;
   }
 });
 
@@ -66,11 +60,17 @@ async function initThemeByShift() {
       console.log('[login] getCurrentShift result:', res);
       // res is object like { shift_name: 'pagi' | 'malam' }
       shift = typeof res === 'string' ? res : (res?.shift_name || res?.shift || 'siang');
+    } else {
+      // Fallback by local time when API is not available
+      const hour = new Date().getHours();
+      shift = (hour >= 19 || hour < 7) ? 'malam' : 'siang';
+      console.log('[login] API getCurrentShift tidak tersedia, fallback waktu ->', shift);
     }
     applyTheme(shift);
   } catch (err) {
-    console.warn('Gagal mendapatkan shift, pakai light mode:', err);
-    applyTheme('siang');
+    console.warn('Gagal mendapatkan shift, fallback waktu:', err);
+    const hour = new Date().getHours();
+    applyTheme((hour >= 19 || hour < 7) ? 'malam' : 'siang');
   }
 }
 
@@ -80,4 +80,18 @@ function applyTheme(shift) {
   body.classList.remove('theme-light', 'theme-dark');
   const useDark = ['malam', 'night', 'dark'].includes(String(shift).toLowerCase());
   body.classList.add(useDark ? 'theme-dark' : 'theme-light');
+}
+
+function showAlert(type, message) {
+  const container = document.getElementById('alert-container');
+  if (!container) {
+    console.warn('[login] alert-container element not found');
+    return;
+  }
+  container.innerHTML = `
+    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+      ${message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  `;
 }

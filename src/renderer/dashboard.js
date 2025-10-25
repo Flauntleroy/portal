@@ -854,20 +854,30 @@ async function closeSimrsSession() {
 }
 
 // Logout function
-function logout() {
-  // Close any active SIMRS session before logout
-  if (currentSimrsLogId) {
-    window.api.closeSimrs(currentSimrsLogId)
-      .catch(error => console.error('Error closing SIMRS session during logout:', error));
-  }
+async function logout() {
+  try {
+    const userJson = localStorage.getItem('currentUser');
+    const user = userJson ? JSON.parse(userJson) : null;
 
-  // Clear refresh interval if exists
-  if (window.simrsHistoryRefreshInterval) {
-    clearInterval(window.simrsHistoryRefreshInterval);
-  }
+    // Tutup semua sesi SIMRS aktif milik user di backend
+    if (user && user.id && window.api && window.api.closeAllSimrsForUser) {
+      try {
+        const result = await window.api.closeAllSimrsForUser(user.id);
+        console.log('closeAllSimrsForUser result:', result);
+      } catch (e) {
+        console.error('Gagal menutup semua sesi SIMRS user saat logout', e);
+      }
+    }
 
-  localStorage.removeItem('currentUser');
-  window.location.href = 'login.html';
+    // Hapus data user dari localStorage dengan aman
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('activeSimrsLogId');
+
+    // Redirect ke halaman login
+    window.location.href = 'login.html';
+  } catch (error) {
+    console.error('Error during logout:', error);
+  }
 }
 
 // ===== SHIFT SYSTEM FUNCTIONS =====
