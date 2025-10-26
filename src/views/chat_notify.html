@@ -7,64 +7,403 @@
   <title>Notifikasi Chat</title>
   <style>
     :root {
-      --overlay-bg: rgba(19, 23, 28, 0.96);
-      --overlay-border: rgba(255,255,255,.12);
-      --overlay-text: #ffffff;
-      --accent: #1a8e83; /* konsisten dengan tema aplikasi */
-      --accent-dark: #0e6b62;
-      --bubble-bg: #ffffff;
-      --bubble-text: #0b1320;
-      --muted-bg: rgba(255,255,255,.18);
-      --muted-bg-hover: rgba(255,255,255,.28);
+      --overlay-bg: linear-gradient(135deg, rgba(15, 23, 42, 0.97) 0%, rgba(30, 41, 59, 0.95) 100%);
+      --overlay-border: rgba(148, 163, 184, 0.2);
+      --overlay-text: #f1f5f9;
+      --accent: #10b981;
+      --accent-dark: #059669;
+      --accent-glow: rgba(16, 185, 129, 0.2);
+      --bubble-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      --bubble-text: #0f172a;
+      --bubble-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      --muted-bg: rgba(148, 163, 184, 0.15);
+      --muted-bg-hover: rgba(148, 163, 184, 0.25);
+      --radius: 16px;
+      --gap: 10px;
     }
-    html, body { margin: 0; height: 100%; background: transparent; font-family: 'Poppins', 'Segoe UI', Tahoma, sans-serif; }
+    
+    html, body { 
+      margin: 0; 
+      height: 100%; 
+      background: transparent; 
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    body {
+      margin: 0;
+      height: 100vh;
+      background: transparent;
+    }
+
     .container {
-      box-shadow: 0 12px 30px rgba(0,0,0,.35);
-      border-radius: 12px;
-      background: var(--overlay-bg);
-      color: var(--overlay-text);
-      border: 1px solid var(--overlay-border);
-      width: 100%; height: 100%;
-      padding: 12px 14px;
-      display: flex; flex-direction: column; gap: 10px;
-      backdrop-filter: saturate(1.1) blur(8px);
-      animation: slideIn .18s ease-out;
+      background: rgba(30, 41, 59, 0.65);
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      max-width: 400px;
     }
-    @keyframes slideIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    .header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
-    .name { display: flex; align-items: center; gap: 8px; }
-    .body { flex: 1; display: flex; align-items: flex-end; }
-    .bubble { background: var(--bubble-bg); color: var(--bubble-text); padding: 10px 12px; border-radius: 12px; max-width: 92%; line-height: 1.35; word-break: break-word; }
-    .footer { display: flex; align-items: center; gap: 8px; }
-    .reply-input { flex: 1; border: none; border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,.1); color: #fff; outline: none; }
-    .reply-input::placeholder { color: rgba(255,255,255,.65); }
-    .btn { border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: var(--accent-dark); }
-    .btn-muted { background: var(--muted-bg); color: #fff; }
-    .btn-muted:hover { background: var(--muted-bg-hover); }
-    .badge { background: #ef4444; color:#fff; border-radius: 999px; padding:2px 8px; font-size: 11px; }
-    .send-state { font-size: 12px; opacity: .85; }
-    @media (max-width: 520px) { .container { padding: 10px; } .bubble { max-width: 100%; } }
+
+    .container::before {
+      height: 4px;
+      background: linear-gradient(90deg, #10b981, #3b82f6);
+      border-radius: 4px 4px 0 0;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateY(10px) scale(0.98);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+    }
+
+    .container {
+      animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .header { 
+      display: flex; 
+      align-items: flex-start; 
+      justify-content: space-between; 
+      gap: 12px;
+      padding-bottom: 4px;
+    }
+    
+    .name { 
+      display: flex; 
+      align-items: center; 
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .avatar { 
+      width: 44px; 
+      height: 44px; 
+      border-radius: 12px; 
+      background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
+      display: grid; 
+      place-items: center; 
+      font-weight: 700; 
+      font-size: 18px;
+      color: #ffffff;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px var(--accent-glow);
+      letter-spacing: 0.5px;
+    }
+    
+    .sender-info { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 4px; 
+      flex: 1;
+      min-width: 0;
+      padding-top: 2px;
+    }
+    
+    .unit-badge { 
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.9) 100%);
+      color: #ffffff; 
+      padding: 3px 10px; 
+      border-radius: 6px; 
+      font-size: 11px; 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      letter-spacing: 0.8px; 
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      max-width: fit-content;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .unit-badge::before { 
+      content: "🏢"; 
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    
+    .sender-name { 
+      font-weight: 700; 
+      letter-spacing: 0.3px; 
+      font-size: 16px; 
+      color: #ffffff;
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    
+    .subtle { 
+      opacity: 0.7;
+      font-size: 12px;
+      font-weight: 500;
+      color: #cbd5e1;
+      white-space: nowrap;
+    }
+    
+    .badge { 
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: #fff; 
+      border-radius: 999px; 
+      padding: 3px 9px; 
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .body { 
+      display: flex; 
+      align-items: flex-end; 
+      overflow: hidden;
+      padding: 8px 0;
+    }
+    
+    .bubble {
+      background: #ffffff;
+      color: #0f172a;
+      padding: 14px 18px;
+      border-radius: 14px 14px 14px 4px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+      font-size: 14px;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .bubble:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+    
+    @keyframes bubbleIn {
+      from {
+        transform: translateX(-8px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    .footer { 
+      display: flex; 
+      align-items: center; 
+      gap: 8px;
+      padding-top: 4px;
+    }
+    
+    .reply-input { 
+      flex: 1; 
+      border: 2px solid rgba(148, 163, 184, 0.2);
+      border-radius: 10px; 
+      padding: 10px 14px; 
+      background: rgba(15, 23, 42, 0.4);
+      color: #f1f5f9; 
+      outline: none; 
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    
+    .reply-input:focus {
+      border-color: var(--accent);
+      background: rgba(15, 23, 42, 0.6);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    
+    .reply-input::placeholder { 
+      color: rgba(203, 213, 225, 0.6);
+    }
+    
+.btn {
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.25s ease;
+}
+    
+.btn:active {
+  transform: scale(0.96);
+}
+    
+.btn-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #0ea57a 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25);
+}
+    
+.btn-muted {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-muted:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+    
+    .btn-muted:hover { 
+      background: var(--muted-bg-hover);
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .btn-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.12); /* lebih kontras */
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(6px);
+    }
+
+    .btn-close:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: scale(1.1);
+    }
+
+    .btn-close svg {
+      width: 20px;
+      height: 20px;
+      stroke: #ffffff;
+      stroke-width: 2;
+    }
+    
+    .send-state { 
+      font-size: 12px; 
+      opacity: 0.85;
+      margin-top: 4px;
+      color: #cbd5e1;
+      font-weight: 500;
+    }
+    
+    @media (max-width: 480px) {
+      .container { 
+        padding: 14px 16px;
+      }
+    .avatar {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      font-size: 18px;
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);
+      border-radius: 50%; /* 🟢 dari kotak jadi lingkaran */
+    }
+
+    .sender-name {
+      font-weight: 600;
+      font-size: 15px;
+      color: #ffffff;
+    }
+      .unit-badge { 
+        font-size: 10px; 
+        padding: 2px 8px;
+      }
+
+      .bubble {
+        font-size: 13px;
+        padding: 10px 14px;
+      }
+      .btn {
+        padding: 9px 12px;
+        font-size: 12px;
+      }
+    }
+    
+    @media (max-width: 360px) {
+      .container { 
+        padding: 12px 14px;
+      }
+      .avatar { 
+        width: 34px; 
+        height: 34px; 
+        font-size: 14px;
+      }
+      .unit-badge { 
+        font-size: 9px;
+        padding: 2px 6px;
+      }
+      .sender-name { 
+        font-size: 13px;
+      }
+      .bubble {
+        font-size: 12px;
+      }
+    }
+    
+    @media (min-width: 720px) { 
+      .container { 
+        padding: 18px 20px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container" role="dialog" aria-label="Notifikasi Chat">
+    <button class="btn-close" id="btnClose" aria-label="Tutup notifikasi">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+        <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-linecap="round"/>
+      </svg>
+    </button>
     <div class="header">
       <div class="name">
-        <span id="senderName">Pengguna</span>
-        <span id="unreadBadge" class="badge" style="display:none">1</span>
+        <div id="avatar" class="avatar" aria-hidden="true">A</div>
+        <div class="sender-info">
+          <div id="unitBadge" class="unit-badge" style="display:none">Unit</div>
+          <span id="senderName" class="sender-name" title="Pengirim">Pengguna</span>
+        </div>
       </div>
-      <div><small style="opacity:.8">Pesan baru</small></div>
+      <!-- <div class="header-right">
+        <span id="unreadBadge" class="badge" style="display:none">1</span>
+        <div class="subtle"><small>Pesan baru</small></div>
+      </div> -->
     </div>
     <div class="body" aria-live="polite">
       <div class="bubble" id="messageText">Pesan masuk…</div>
     </div>
     <div class="footer">
-      <input id="replyInput" class="reply-input" type="text" maxlength="500" placeholder="Ketik balasan…" aria-label="Ketik balasan" />
+      <input id="replyInput" class="reply-input" type="text" maxlength="300" placeholder="Ketik balasan…" aria-label="Ketik balasan" />
       <button class="btn btn-primary" id="btnSend" aria-label="Kirim balasan">Kirim</button>
       <button class="btn btn-muted" id="btnReply" aria-label="Buka pop-up chat">Buka Chat</button>
-      <button class="btn btn-muted" id="btnClose" aria-label="Tutup notifikasi">Tutup</button>
+      <!-- <button class="btn btn-muted" id="btnClose" aria-label="Tutup notifikasi">Tutup</button> -->
     </div>
     <div class="send-state" id="sendState" aria-live="polite" style="display:none"></div>
   </div>
@@ -101,14 +440,33 @@
       }
       function setData(d){
         payload = d || {};
-        document.getElementById('senderName').textContent = d.sender_name || d.sender || 'Pengguna';
-        document.getElementById('messageText').textContent = d.message || '';
+        const name = d.sender_name || d.sender || 'Pengguna';
+        const unit = d.unit_kerja || d.sender_unit || null;
+        
+        const sn = document.getElementById('senderName');
+        if (sn) { sn.textContent = name; try { sn.setAttribute('title', name); } catch(e){} }
+        
+        const unitEl = document.getElementById('unitBadge');
+        if (unitEl) {
+          if (unit && unit !== '-') {
+            unitEl.textContent = unit;
+            unitEl.style.display = 'block';
+            unitEl.setAttribute('title', `Unit: ${unit}`);
+          } else {
+            unitEl.style.display = 'none';
+          }
+        }
+        
+        const msgEl = document.getElementById('messageText');
+        if (msgEl) msgEl.textContent = d.message || '';
         const bc = Number(d.unread_count || 0);
         const badgeEl = document.getElementById('unreadBadge');
         if (badgeEl) {
           badgeEl.textContent = String(bc);
           badgeEl.style.display = bc > 0 ? 'inline-block' : 'none';
         }
+        const av = document.getElementById('avatar');
+        if (av) { av.textContent = (name || '?').trim().charAt(0).toUpperCase(); }
         playSound();
         const input = document.getElementById('replyInput');
         try { input.focus(); input.select(); } catch(e){}
@@ -137,10 +495,8 @@
             btn.textContent = 'Terkirim';
             state.textContent = 'Balasan terkirim';
             setTimeout(() => { btn.textContent = 'Kirim'; state.style.display = 'none'; }, 800);
-            // Buka pop-up chat dan muat room setelah kirim
             try { window.api.openChatFromOverlay({ sender_id: payload.sender_id, room_id: (payload.room_id || data?.data?.room_id) }); } catch(e){}
-            // Tutup overlay agar tidak menumpuk
-            setTimeout(() => { try { window.api.closeChatOverlay(); } catch(e){} }, 300);
+            setTimeout(() => { try { window.api.closeChatOverlay(); } catch(e){} }, 250);
           } else {
             btn.textContent = 'Kirim'; btn.disabled = false;
             state.textContent = 'Gagal mengirim';
