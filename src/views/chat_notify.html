@@ -6,32 +6,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Notifikasi Chat</title>
   <style>
+    :root {
+      --overlay-bg: rgba(19, 23, 28, 0.96);
+      --overlay-border: rgba(255,255,255,.12);
+      --overlay-text: #ffffff;
+      --accent: #1a8e83; /* konsisten dengan tema aplikasi */
+      --accent-dark: #0e6b62;
+      --bubble-bg: #ffffff;
+      --bubble-text: #0b1320;
+      --muted-bg: rgba(255,255,255,.18);
+      --muted-bg-hover: rgba(255,255,255,.28);
+    }
     html, body { margin: 0; height: 100%; background: transparent; font-family: 'Poppins', 'Segoe UI', Tahoma, sans-serif; }
     .container {
       box-shadow: 0 12px 30px rgba(0,0,0,.35);
       border-radius: 12px;
-      background: rgba(19, 23, 28, 0.96);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,.12);
+      background: var(--overlay-bg);
+      color: var(--overlay-text);
+      border: 1px solid var(--overlay-border);
       width: 100%; height: 100%;
       padding: 12px 14px;
       display: flex; flex-direction: column; gap: 10px;
+      backdrop-filter: saturate(1.1) blur(8px);
+      animation: slideIn .18s ease-out;
     }
+    @keyframes slideIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; }
     .name { display: flex; align-items: center; gap: 8px; }
     .body { flex: 1; display: flex; align-items: flex-end; }
-    .bubble { background: #ffffff; color: #0b1320; padding: 10px 12px; border-radius: 12px; max-width: 92%; line-height: 1.35; word-break: break-word; }
-    .footer { display: flex; justify-content: flex-end; gap: 8px; }
+    .bubble { background: var(--bubble-bg); color: var(--bubble-text); padding: 10px 12px; border-radius: 12px; max-width: 92%; line-height: 1.35; word-break: break-word; }
+    .footer { display: flex; align-items: center; gap: 8px; }
+    .reply-input { flex: 1; border: none; border-radius: 8px; padding: 8px 10px; background: rgba(255,255,255,.1); color: #fff; outline: none; }
+    .reply-input::placeholder { color: rgba(255,255,255,.65); }
     .btn { border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-weight: 600; }
-    .btn-primary { background: #1a8e83; color: #fff; }
-    .btn-primary:hover { background: #0e6b62; }
-    .btn-muted { background: rgba(255,255,255,.18); color: #fff; }
-    .btn-muted:hover { background: rgba(255,255,255,.28); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-dark); }
+    .btn-muted { background: var(--muted-bg); color: #fff; }
+    .btn-muted:hover { background: var(--muted-bg-hover); }
     .badge { background: #ef4444; color:#fff; border-radius: 999px; padding:2px 8px; font-size: 11px; }
+    .send-state { font-size: 12px; opacity: .85; }
+    @media (max-width: 520px) { .container { padding: 10px; } .bubble { max-width: 100%; } }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="container" role="dialog" aria-label="Notifikasi Chat">
     <div class="header">
       <div class="name">
         <span id="senderName">Pengguna</span>
@@ -39,17 +57,33 @@
       </div>
       <div><small style="opacity:.8">Pesan baru</small></div>
     </div>
-    <div class="body">
+    <div class="body" aria-live="polite">
       <div class="bubble" id="messageText">Pesan masuk…</div>
     </div>
     <div class="footer">
-      <button class="btn btn-muted" id="btnClose">Tutup</button>
-      <button class="btn btn-primary" id="btnReply">Balas</button>
+      <input id="replyInput" class="reply-input" type="text" maxlength="500" placeholder="Ketik balasan…" aria-label="Ketik balasan" />
+      <button class="btn btn-primary" id="btnSend" aria-label="Kirim balasan">Kirim</button>
+      <button class="btn btn-muted" id="btnReply" aria-label="Buka pop-up chat">Buka Chat</button>
+      <button class="btn btn-muted" id="btnClose" aria-label="Tutup notifikasi">Tutup</button>
     </div>
+    <div class="send-state" id="sendState" aria-live="polite" style="display:none"></div>
   </div>
   <script>
     (function(){
       let payload = {};
+      let CHAT_BASE_URL = 'http://localhost:3002';
+      let SOCKET_IO_PATH = '/socket.io';
+
+      async function initBaseUrl(){
+        try {
+          if (window.api?.getChatBaseUrl) {
+            const url = await window.api.getChatBaseUrl();
+            if (url) CHAT_BASE_URL = url;
+            try { const u = new URL(CHAT_BASE_URL); const basePath = (u.pathname||'').replace(/\/+$/, ''); SOCKET_IO_PATH = basePath ? `${basePath}/socket.io` : '/socket.io'; } catch {}
+          }
+        } catch {}
+      }
+
       function playSound(){
         try {
           const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
@@ -76,13 +110,59 @@
           badgeEl.style.display = bc > 0 ? 'inline-block' : 'none';
         }
         playSound();
+        const input = document.getElementById('replyInput');
+        try { input.focus(); input.select(); } catch(e){}
       }
+
+      async function sendReply(){
+        try {
+          const input = document.getElementById('replyInput');
+          const btn = document.getElementById('btnSend');
+          const state = document.getElementById('sendState');
+          const text = String(input.value || '').trim();
+          if (!text) return;
+          btn.disabled = true; btn.textContent = 'Mengirim…';
+          state.style.display = 'block'; state.textContent = 'Mengirim balasan…';
+          const payloadSend = {
+            sender_id: payload.me_id,
+            room_id: payload.room_id,
+            recipient_id: payload.room_id ? undefined : payload.sender_id,
+            message: text,
+            message_type: 'text'
+          };
+          const r = await fetch(`${CHAT_BASE_URL}/api/messages`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(payloadSend) });
+          const data = await r.json();
+          if (data?.success) {
+            input.value = '';
+            btn.textContent = 'Terkirim';
+            state.textContent = 'Balasan terkirim';
+            setTimeout(() => { btn.textContent = 'Kirim'; state.style.display = 'none'; }, 800);
+            // Buka pop-up chat dan muat room setelah kirim
+            try { window.api.openChatFromOverlay({ sender_id: payload.sender_id, room_id: (payload.room_id || data?.data?.room_id) }); } catch(e){}
+            // Tutup overlay agar tidak menumpuk
+            setTimeout(() => { try { window.api.closeChatOverlay(); } catch(e){} }, 300);
+          } else {
+            btn.textContent = 'Kirim'; btn.disabled = false;
+            state.textContent = 'Gagal mengirim';
+          }
+        } catch(e){
+          const btn = document.getElementById('btnSend');
+          const state = document.getElementById('sendState');
+          btn.textContent = 'Kirim'; btn.disabled = false;
+          state.style.display = 'block'; state.textContent = 'Terjadi kesalahan jaringan';
+        }
+      }
+
+      document.getElementById('btnSend').addEventListener('click', sendReply);
+      document.getElementById('replyInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendReply(); });
       document.getElementById('btnReply').addEventListener('click', function(){
         try { window.api.openChatFromOverlay({ sender_id: payload.sender_id, room_id: payload.room_id }); } catch(e){}
       });
       document.getElementById('btnClose').addEventListener('click', function(){
         try { window.api.closeChatOverlay(); } catch(e){}
       });
+
+      initBaseUrl();
       try { window.api.onChatOverlayMessage(function(d){ setData(d); }); } catch(e) { setData({ sender_name:'Chat', message:'Pesan baru' }); }
     })();
   </script>

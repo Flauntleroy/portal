@@ -416,27 +416,36 @@ function createChatModal(peer) {
   if (!el) {
     el = document.createElement('div');
     el.id = mid;
-    el.className = 'modal fade';
+    el.className = 'modal fade chat-modal';
     el.innerHTML = `
-      <div class="modal-dialog modal-lg modal-dialog-end" style="max-width: 560px;">
+      <div class="modal-dialog modal-lg modal-dialog-end chat-modal-anim" style="max-width: 560px;">
         <div class="modal-content" style="border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);">
           <div class="modal-header py-2" style="background:#1a8e83;color:#fff;">
             <h6 class="modal-title"><i class="fas fa-user me-2"></i>${peer.full_name || peer.username || 'Pengguna'}</h6>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button" class="btn btn-light btn-sm btn-minimize" aria-label="Minimalkan"><i class="fas fa-minus"></i></button>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
           </div>
           <div class="modal-body" style="max-height: 480px; overflow-y: auto; background:#f8fafc;">
             <div class="chat-mini-messages"></div>
           </div>
           <div class="modal-footer py-2">
             <div class="input-group">
-              <input type="text" class="form-control chat-mini-input" placeholder="Tulis pesan…" />
-              <button class="btn btn-primary chat-mini-send" type="button"><i class="fas fa-paper-plane"></i></button>
+              <input type="text" class="form-control chat-mini-input" placeholder="Tulis pesan…" aria-label="Tulis pesan" />
+              <button class="btn btn-primary chat-mini-send" type="button" aria-label="Kirim"><i class="fas fa-paper-plane"></i></button>
             </div>
           </div>
         </div>
       </div>
     `;
     document.body.appendChild(el);
+    // Animasi show/hide yang smooth
+    el.addEventListener('shown.bs.modal', () => { try { el.querySelector('.chat-modal-anim')?.classList.add('showing'); } catch(e){} });
+    el.addEventListener('hide.bs.modal', () => { try { el.querySelector('.chat-modal-anim')?.classList.remove('showing'); } catch(e){} });
+    // Minimize/restore
+    const btnMin = el.querySelector('.btn-minimize');
+    if (btnMin) btnMin.addEventListener('click', () => { el.classList.toggle('minimized'); });
   }
   const modal = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
   const handle = {
@@ -592,9 +601,10 @@ async function initChatPresence(userId) {
         // Selalu munculkan overlay notifikasi
         try {
           const peer = await resolveUserById(m.sender_id);
-          if (peer && window.api && typeof window.api.notifyChat === 'function') {
+          if (String(m.sender_id) !== String(meId) && peer && window.api && typeof window.api.notifyChat === 'function') {
             const unreadCount = window.unreadCountsByUserId?.[m.sender_id] || 1;
             window.api.notifyChat({
+              me_id: meId,
               sender_id: m.sender_id,
               sender_name: peer.full_name || peer.username || 'Pengguna',
               room_id: m.room_id,

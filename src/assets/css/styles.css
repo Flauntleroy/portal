@@ -444,3 +444,27 @@ body {
  .tick { font-weight: 700; }
  .tick.double { letter-spacing: -2px; }
  .tick.double.read { color: #0ea5e9; }
+
+/* Chat popup positioning and animations */
+.modal-dialog.modal-dialog-end {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+}
+.chat-modal-anim {
+  transform: translateY(8px);
+  opacity: 0;
+  transition: transform .18s ease, opacity .18s ease;
+}
+.chat-modal-anim.showing {
+  transform: translateY(0);
+  opacity: 1;
+}
+.chat-modal.minimized .modal-content {
+  height: 52px;
+}
+.chat-modal.minimized .modal-body,
+.chat-modal.minimized .modal-footer {
+  display: none !important;
+}
