@@ -222,39 +222,55 @@ ipcMain.handle('chat:get-base-url', async () => {
 // Chat overlay IPC handlers
 function createChatOverlay(data) {
   try {
+    // Jika overlay sudah ada, gunakan kembali agar tidak muncul jendela ganda
     if (chatOverlayWindow && !chatOverlayWindow.isDestroyed()) {
-      try { chatOverlayWindow.close(); } catch(e) {}
-      chatOverlayWindow = null;
-    }
-    const preloadPath = path.join(appRoot, 'preload.js');
-    const overlayHtmlPath = path.join(appRoot, 'src', 'views', 'chat_notify.html');
-    chatOverlayWindow = new BrowserWindow({
-      width: 560,
-      height: 300,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      resizable: false,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        preload: preloadPath
-      }
-    });
-    chatOverlayWindow.loadFile(overlayHtmlPath);
-    try { chatOverlayWindow.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
-    try { chatOverlayWindow.setVisibleOnAllWorkspaces(true); } catch(e) {}
-    try { chatOverlayWindow.setFocusable(true); } catch(e) {}
-
-    chatOverlayWindow.once('ready-to-show', () => {
       try {
         const { workArea } = screen.getPrimaryDisplay();
         const b = chatOverlayWindow.getBounds();
         const x = workArea.x + workArea.width - b.width - 16;
         const y = workArea.y + workArea.height - b.height - 16;
         chatOverlayWindow.setPosition(x, y);
+        chatOverlayWindow.webContents.send('chat:overlay-message', data);
         chatOverlayWindow.show();
+      } catch(e) { log.warn('reuse overlay error', e); }
+      return;
+    }
+
+    const preloadPath = path.join(appRoot, 'preload.js');
+    const overlayHtmlPath = path.join(appRoot, 'src', 'views', 'chat_notify.html');
+
+    chatOverlayWindow = new BrowserWindow({
+      width: 420,
+      height: 200,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: preloadPath
+      }
+    });
+
+    chatOverlayWindow.loadFile(overlayHtmlPath);
+
+    try { chatOverlayWindow.setAlwaysOnTop(true, 'screen-saver'); } catch(e) {}
+    try { chatOverlayWindow.setVisibleOnAllWorkspaces(true); } catch(e) {}
+    try { chatOverlayWindow.setFocusable(true); } catch(e) {}
+
+    chatOverlayWindow.once('ready-to-show', () => {
+      try {
+        if (!chatOverlayWindow || chatOverlayWindow.isDestroyed()) return;
+        const { workArea } = screen.getPrimaryDisplay();
+        const b = chatOverlayWindow.getBounds();
+        const x = workArea.x + workArea.width - b.width - 16;
+        const y = workArea.y + workArea.height - b.height - 16;
+        chatOverlayWindow.setPosition(x, y);
+        chatOverlayWindow.show();
+        try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus(); } catch (e) {}
       } catch (e) { log.warn('position overlay error', e); }
     });
 

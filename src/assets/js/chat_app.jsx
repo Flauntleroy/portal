@@ -133,9 +133,11 @@ function ChatApp() {
           {contacts.map(c => (
             <div key={c.id} className={`d-flex align-items-center p-2 ${selected?.id===c.id?'bg-light':''}`} style={{cursor:'pointer'}} onClick={() => selectContact(c)}>
               <span className={`online-dot ${onlineMap[c.id]?'online':'offline'}`}></span>
-              <div>
-                <div>{c.full_name || c.username}</div>
-                <div className="text-muted" style={{fontSize:'12px'}}>{c.unit_kerja || '-'}</div>
+              <div className="flex-grow-1">
+                {c.unit_kerja && c.unit_kerja !== '-' && (
+                  <div className="unit-badge-chat" title={`Unit: ${c.unit_kerja}`}>{c.unit_kerja}</div>
+                )}
+                <div className="fw-semibold">{c.full_name || c.username}</div>
               </div>
             </div>
           ))}
@@ -144,7 +146,14 @@ function ChatApp() {
       <div className="col-8 d-flex flex-column">
         <div className="border-bottom p-2">
           {selected ? (
-            <strong>Chat dengan {selected.full_name || selected.username}</strong>
+            <div className="d-flex align-items-center">
+              <div className="sender-info-chat">
+                {selected.unit_kerja && selected.unit_kerja !== '-' && (
+                  <div className="unit-badge-chat" title={`Unit: ${selected.unit_kerja}`}>{selected.unit_kerja}</div>
+                )}
+                <strong>Chat dengan {selected.full_name || selected.username}</strong>
+              </div>
+            </div>
           ) : (
             <span className="text-muted">Pilih kontak untuk mulai chat</span>
           )}

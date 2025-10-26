@@ -439,6 +439,55 @@ body {
    border-color: var(--teal-dark);
  }
 
+/* Modal unit badge styles */
+.sender-info-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.unit-badge-modal {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: inline-block;
+  max-width: fit-content;
+  position: relative;
+}
+.unit-badge-modal::before {
+  content: "🏢";
+  margin-right: 3px;
+  font-size: 8px;
+}
+
+/* Responsive modal adjustments */
+@media (max-width: 768px) {
+  .modal-dialog.modal-dialog-end {
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100vw - 16px) !important;
+  }
+  .unit-badge-modal {
+    font-size: 9px;
+    padding: 1px 6px;
+  }
+}
+@media (max-width: 480px) {
+  .modal-dialog.modal-dialog-end {
+    right: 4px;
+    bottom: 4px;
+    max-width: calc(100vw - 8px) !important;
+  }
+  .unit-badge-modal {
+    font-size: 8px;
+    padding: 1px 5px;
+  }
+}
+
  /* Message status ticks */
  .msg-status { color: #6b7280; }
  .tick { font-weight: 700; }

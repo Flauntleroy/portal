@@ -421,7 +421,13 @@ function createChatModal(peer) {
       <div class="modal-dialog modal-lg modal-dialog-end chat-modal-anim" style="max-width: 560px;">
         <div class="modal-content" style="border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);">
           <div class="modal-header py-2" style="background:#1a8e83;color:#fff;">
-            <h6 class="modal-title"><i class="fas fa-user me-2"></i>${peer.full_name || peer.username || 'Pengguna'}</h6>
+            <div class="d-flex align-items-center">
+              <i class="fas fa-user me-2"></i>
+              <div class="sender-info-modal">
+                ${peer.unit_kerja && peer.unit_kerja !== '-' ? `<div class="unit-badge-modal" title="Unit: ${peer.unit_kerja}">${peer.unit_kerja}</div>` : ''}
+                <h6 class="modal-title mb-0" title="${peer.full_name || peer.username || 'Pengguna'}">${peer.full_name || peer.username || 'Pengguna'}</h6>
+              </div>
+            </div>
             <div class="d-flex align-items-center gap-2">
               <button type="button" class="btn btn-light btn-sm btn-minimize" aria-label="Minimalkan"><i class="fas fa-minus"></i></button>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -607,6 +613,7 @@ async function initChatPresence(userId) {
               me_id: meId,
               sender_id: m.sender_id,
               sender_name: peer.full_name || peer.username || 'Pengguna',
+              unit_kerja: peer.unit_kerja || null,
               room_id: m.room_id,
               message: m.message,
               unread_count: unreadCount
