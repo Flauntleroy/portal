@@ -8,15 +8,28 @@ let currentUser = null;
 let currentSimrsLogId = null;
 
 // Chat presence globals
-const CHAT_BASE_URL = 'http://localhost:3002';
+let CHAT_BASE_URL = 'http://localhost:3002';
+let SOCKET_IO_PATH = '/socket.io';
 let chatSocket = null;
 let chatPingInterval = null;
 let presenceListReceived = false;
 
 // Wait for DOM to be fully loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   console.log('DOM Content Loaded - Dashboard');
   console.log('Checking if elements exist...');
+  try {
+    if (window.api?.getChatBaseUrl) {
+      const url = await window.api.getChatBaseUrl();
+      if (url) { CHAT_BASE_URL = url; console.log('[chat] base url set to', CHAT_BASE_URL); }
+    }
+    try {
+      const u = new URL(CHAT_BASE_URL);
+      const basePath = (u.pathname || '').replace(/\/+$/, '');
+      SOCKET_IO_PATH = basePath ? `${basePath}/socket.io` : '/socket.io';
+      console.log('[chat] socket.io path set to', SOCKET_IO_PATH);
+    } catch {}
+  } catch(e) { console.warn('failed getChatBaseUrl', e); }
   
   // Check if critical elements exist
   const runSimrsBtn = document.getElementById('run-simrs-btn');
@@ -337,8 +350,34 @@ try {
   if (window.api && !window._chatIpcBinded) {
     window.api.onChatOpenModal(async (payload) => {
       try {
-        const peer = await resolveUserById(payload.sender_id);
-        if (peer) openChatPopup(peer);
+        // Coba resolve user dari cache/presence; fallback ke objek minimal
+        let peer = await resolveUserById(payload.sender_id);
+        if (!peer) {
+          peer = { id: payload.sender_id, full_name: payload.sender_name || 'Pengguna' };
+        }
+        // Pastikan modal tercipta
+        let handle = chatPopupsByUserId[peer.id];
+        if (!handle) {
+          handle = createChatModal(peer);
+          chatPopupsByUserId[peer.id] = handle;
+        }
+        handle.modal.show();
+        // Jika room_id dari overlay tersedia, langsung pakai itu
+        if (payload.room_id) {
+          handle.roomId = payload.room_id;
+          chatPopupsByRoomId[payload.room_id] = handle;
+          if (window._chatSocket) window._chatSocket.emit('room:join', { room_id: payload.room_id });
+          await loadMessagesIntoHandle(handle, payload.room_id);
+        } else {
+          // Fallback: resolve / buat direct-room
+          const meId = getCurrentUserId();
+          const r = await fetch(`${CHAT_BASE_URL}/api/direct-room?user_id=${meId}&peer_id=${peer.id}`);
+          const room = await r.json();
+          handle.roomId = room.id;
+          chatPopupsByRoomId[room.id] = handle;
+          if (window._chatSocket) window._chatSocket.emit('room:join', { room_id: room.id });
+          await loadMessagesIntoHandle(handle, room.id);
+        }
       } catch (e) { console.warn('open-modal IPC error', e); }
     });
     window._chatIpcBinded = true;
@@ -379,17 +418,17 @@ function createChatModal(peer) {
     el.id = mid;
     el.className = 'modal fade';
     el.innerHTML = `
-      <div class="modal-dialog modal-md modal-dialog-end">
+      <div class="modal-dialog modal-lg modal-dialog-end" style="max-width: 560px;">
         <div class="modal-content" style="border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.15);">
           <div class="modal-header py-2" style="background:#1a8e83;color:#fff;">
             <h6 class="modal-title"><i class="fas fa-user me-2"></i>${peer.full_name || peer.username || 'Pengguna'}</h6>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <div class="modal-body" style="max-height: 360px; overflow-y: auto; background:#f8fafc;">
+          <div class="modal-body" style="max-height: 480px; overflow-y: auto; background:#f8fafc;">
             <div class="chat-mini-messages"></div>
           </div>
           <div class="modal-footer py-2">
-            <div class="input-group input-group-sm">
+            <div class="input-group">
               <input type="text" class="form-control chat-mini-input" placeholder="Tulis pesan…" />
               <button class="btn btn-primary chat-mini-send" type="button"><i class="fas fa-paper-plane"></i></button>
             </div>
@@ -415,14 +454,27 @@ function createChatModal(peer) {
 }
 
 function renderMessageBubble(m, meId) {
-  const div = document.createElement('div');
   const mine = String(m.sender_id) === String(meId);
+  const div = document.createElement('div');
   div.className = `message ${mine ? 'me' : 'other'}`;
-  div.style.padding = '6px 8px';
-  div.style.borderRadius = '6px';
-  div.style.marginBottom = '8px';
-  div.style.background = mine ? '#e7f1ff' : '#f7f7f7';
-  div.textContent = m.message;
+  // konten bubble + status
+  const msg = document.createElement('div');
+  msg.textContent = m.message;
+  div.appendChild(msg);
+
+  // status tanda dibaca (hanya untuk pesan saya)
+  if (mine) {
+    const meta = document.createElement('div');
+    meta.style.fontSize = '11px';
+    meta.style.textAlign = 'right';
+    const statusSpan = document.createElement('span');
+    statusSpan.className = 'msg-status';
+    const hasRead = !!(m.reads && m.reads.length) || !!m.read_count || !!m.read_at;
+    // Ubah indikator: tampilkan teks 'Dibaca' atau 'Belum dibaca'
+    statusSpan.textContent = hasRead ? 'Dibaca' : 'Belum dibaca';
+    meta.appendChild(statusSpan);
+    div.appendChild(meta);
+  }
   return div;
 }
 
@@ -473,6 +525,13 @@ function openChatPopup(peer) {
     handle = createChatModal(peer);
     chatPopupsByUserId[peer.id] = handle;
   }
+  // reset unread badge untuk peer ini
+  try {
+    window.unreadCountsByUserId = window.unreadCountsByUserId || {};
+    window.unreadCountsByUserId[peer.id] = 0;
+    updateUnreadBadgeForUser(peer.id);
+  } catch (e) {}
+
   handle.modal.show();
   fetch(`${CHAT_BASE_URL}/api/direct-room?user_id=${meId}&peer_id=${peer.id}`)
     .then(r => r.json())
@@ -497,7 +556,7 @@ async function initChatPresence(userId) {
     logPresence('socket already connected, skip init');
     return;
   }
-  const socket = window.io(CHAT_BASE_URL, { transports: ['websocket'], reconnection: true });
+  const socket = window.io(CHAT_BASE_URL, { transports: ['websocket'], reconnection: true, path: SOCKET_IO_PATH });
   window._chatSocket = socket;
   chatSocket = socket;
 
@@ -521,28 +580,61 @@ async function initChatPresence(userId) {
     socket.on('chat:new_message', async (m) => {
       try {
         let handle = chatPopupsByRoomId[m.room_id];
-        if (!handle) {
-          const peer = await resolveUserById(m.sender_id);
-          if (peer) {
-            try {
-              if (window.api && typeof window.api.notifyChat === 'function') {
-                window.api.notifyChat({
-                  sender_id: m.sender_id,
-                  sender_name: peer.full_name || peer.username || 'Pengguna',
-                  room_id: m.room_id,
-                  message: m.message
-                });
-              }
-            } catch (e) {}
-            // Tidak membuka modal otomatis; user klik "Balas" dari overlay
+        const meId = getCurrentUserId();
+        // Hitung unread per pengirim
+        try {
+          window.unreadCountsByUserId = window.unreadCountsByUserId || {};
+          if (String(m.sender_id) !== String(meId)) {
+            window.unreadCountsByUserId[m.sender_id] = (window.unreadCountsByUserId[m.sender_id] || 0) + 1;
+            updateUnreadBadgeForUser(m.sender_id);
           }
-        } else {
+        } catch (e) {}
+        // Selalu munculkan overlay notifikasi
+        try {
+          const peer = await resolveUserById(m.sender_id);
+          if (peer && window.api && typeof window.api.notifyChat === 'function') {
+            const unreadCount = window.unreadCountsByUserId?.[m.sender_id] || 1;
+            window.api.notifyChat({
+              sender_id: m.sender_id,
+              sender_name: peer.full_name || peer.username || 'Pengguna',
+              room_id: m.room_id,
+              message: m.message,
+              unread_count: unreadCount
+            });
+          }
+        } catch (e) {}
+        // Tetap append ke modal aktif jika ada
+        if (handle) {
           appendMessageToHandle(handle, m);
         }
       } catch (e) { console.warn('chat:new_message handler error', e); }
     });
     socket._chatMessageHandlerInstalled = true;
   }
+
+// Update badge unread pada daftar online users
+function updateUnreadBadgeForUser(userId) {
+  try {
+    const container = document.getElementById('online-users-list');
+    if (!container) return;
+    const btn = container.querySelector(`.chat-start-btn[data-user-id="${userId}"]`);
+    if (!btn) return;
+    const parent = btn.closest('.list-group-item');
+    if (!parent) return;
+    let badge = parent.querySelector(`#unread-badge-${userId}`);
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'badge rounded-pill bg-danger ms-2';
+      badge.id = `unread-badge-${userId}`;
+      badge.textContent = '0';
+      const rightBox = parent.querySelector('.d-flex.align-items-center.gap-2:last-child');
+      (rightBox || parent).appendChild(badge);
+    }
+    const count = window.unreadCountsByUserId?.[userId] || 0;
+    badge.textContent = String(count);
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  } catch (e) { console.warn('updateUnreadBadgeForUser error', e); }
+}
 
   socket.on('presence:list', (list) => {
     presenceListReceived = true;
@@ -568,6 +660,15 @@ async function initChatPresence(userId) {
   };
   try { ping(); } catch (e) {}
   window._chatPingInterval = setInterval(ping, 5000);
+
+  // Tambahkan refresh periodik dari API untuk memastikan konsistensi daftar online
+  try {
+    if (!window._onlineUsersRefreshInterval) {
+      window._onlineUsersRefreshInterval = setInterval(() => {
+        try { refreshOnlineUsersFromAPI(userId); } catch (e) {}
+      }, 10000);
+    }
+  } catch (e) {}
 }
 
 async function refreshOnlineUsersFromAPI(currentUserId) {
@@ -600,15 +701,10 @@ async function refreshOnlineUsersFromPresenceList(list, currentUserId) {
     const res = await fetch(`${CHAT_BASE_URL}/api/online-users?exclude_id=${encodeURIComponent(currentUserId)}`);
     const apiList = await res.json();
 
-    // Filter berdasarkan presence set jika ada
-    let items = Array.isArray(apiList) ? apiList.filter(u => set.size ? set.has(u.id) : true) : [];
+    // Gunakan daftar API sebagai sumber kebenaran; jangan filter ketat dengan presence set
+    const items = Array.isArray(apiList) ? apiList : [];
 
-    // Jika presence tiba-tiba kosong tapi API masih ada data, pakai API agar tidak menghapus daftar secara sementara
-    if ((!items || items.length === 0) && Array.isArray(apiList) && apiList.length > 0 && set.size === 0) {
-      items = apiList;
-    }
-
-    logPresence('refreshFromPresenceList+api', { presence_count: set.size, api_count: (apiList||[]).length, final: (items||[]).length });
+    logPresence('refreshFromPresenceList+api_union', { presence_count: set.size, api_count: (apiList||[]).length, final: (items||[]).length });
     renderOnlineUsers(items);
   } catch (e) {
     console.warn('refreshFromPresenceList error', e);
@@ -640,12 +736,15 @@ function renderOnlineUsers(list) {
         </div>
         <div class="d-flex align-items-center gap-2">
           <small class="text-muted">${u.unit_kerja || '-'}</small>
+          <span class="badge rounded-pill bg-danger ms-2" id="unread-badge-${u.id}" style="display:none">0</span>
           <button class="btn btn-sm btn-outline-primary chat-start-btn" title="Chat" data-user-id="${u.id}"><i class="fas fa-paper-plane"></i></button>
         </div>
       `;
       container.appendChild(item);
       const btn = item.querySelector('.chat-start-btn');
       if (btn) btn.addEventListener('click', () => startChatWithUser(u));
+      // sync badge jika ada data awal (guard terhadap fungsi tidak tersedia)
+      try { if (typeof updateUnreadBadgeForUser === 'function') updateUnreadBadgeForUser(u.id); } catch (e) {}
     });
   }
 
@@ -1327,6 +1426,7 @@ async function logout() {
     // Disconnect chat socket if any
     try { if (chatSocket) { chatSocket.close(); chatSocket = null; } } catch (e) {}
     if (chatPingInterval) { clearInterval(chatPingInterval); chatPingInterval = null; }
+    try { if (window._onlineUsersRefreshInterval) { clearInterval(window._onlineUsersRefreshInterval); window._onlineUsersRefreshInterval = null; } } catch (e) {}
 
     // Redirect ke halaman login
     window.location.href = 'login.html';

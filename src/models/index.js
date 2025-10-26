@@ -1,24 +1,29 @@
 const { Sequelize } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
-const log = require('electron-log');
+let log;
+try { log = require('electron-log'); } catch (e) { log = console; }
 
-// Initialize Sequelize with database connection
-const sequelize = new Sequelize('signon_db', 'monarch', 'LughTuathaDe@#3', {
-  host: '192.168.0.3',
-  port: 3939,
+// Initialize Sequelize with database connection (env-aware)
+const DB_NAME = process.env.DB_NAME || 'signon_db';
+const DB_USER = process.env.DB_USER || 'monarch';
+const DB_PASS = process.env.DB_PASS || 'LughTuathaDe@#3';
+const DB_HOST = process.env.DB_HOST || '192.168.0.3';
+const DB_PORT = parseInt(process.env.DB_PORT || '3939', 10);
+
+const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASS, {
+  host: DB_HOST,
+  port: DB_PORT,
   dialect: 'mysql',
-  logging: msg => log.debug(msg),
+  logging: msg => (log && log.debug ? log.debug(msg) : console.debug(msg)),
   dialectOptions: {
-    connectTimeout: 60000, // 60 seconds
-    acquireTimeout: 60000,
-    timeout: 60000
+    connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT || '60000', 10) // 60 seconds
   },
   pool: {
-    max: 5,
-    min: 0,
-    acquire: 30000,
-    idle: 10000
+    max: parseInt(process.env.DB_POOL_MAX || '5', 10),
+    min: parseInt(process.env.DB_POOL_MIN || '0', 10),
+    acquire: parseInt(process.env.DB_POOL_ACQUIRE || '30000', 10),
+    idle: parseInt(process.env.DB_POOL_IDLE || '10000', 10)
   }
 });
 

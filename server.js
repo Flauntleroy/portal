@@ -237,7 +237,10 @@ io.on('connection', async (socket) => {
     try {
       const userId = parseInt(payload?.user_id, 10);
       if (!userId) return;
-      await db.OnlineUser.create({ user_id: userId, socket_id: socket.id, status: 'online', last_active: new Date(), connected_at: new Date() });
+      // Cache userId on socket and upsert presence to be idempotent
+      socket.data = socket.data || {};
+      socket.data.userId = userId;
+      await db.OnlineUser.upsert({ user_id: userId, socket_id: socket.id, status: 'online', last_active: new Date(), connected_at: new Date() });
       log.info(`[presence] auth user=${userId} socket=${socket.id}`);
 
       // Join all rooms user participates in
@@ -250,7 +253,16 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('presence:ping', async (cb) => {
-    try { await db.OnlineUser.touch(socket.id); } catch (e) {}
+    try {
+      const rec = await db.OnlineUser.findOne({ where: { socket_id: socket.id } });
+      if (rec) {
+        rec.last_active = new Date();
+        rec.status = 'online';
+        await rec.save();
+      } else if (socket.data?.userId) {
+        await db.OnlineUser.upsert({ user_id: socket.data.userId, socket_id: socket.id, status: 'online', last_active: new Date(), connected_at: new Date() });
+      }
+    } catch (e) { log.error('presence:ping update error', e); }
     try { await broadcastPresence(); } catch (e) {}
     if (typeof cb === 'function') {
       cb(Date.now());

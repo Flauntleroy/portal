@@ -1,4 +1,10 @@
 const CHAT_BASE_URL = window.CHAT_BASE_URL || 'http://localhost:3002';
+let SOCKET_IO_PATH = '/socket.io';
+try {
+  const u = new URL(CHAT_BASE_URL);
+  const basePath = (u.pathname || '').replace(/\/+$/, '');
+  SOCKET_IO_PATH = basePath ? `${basePath}/socket.io` : '/socket.io';
+} catch {}
 
 function ChatApp() {
   const [contacts, setContacts] = React.useState([]);
@@ -16,7 +22,7 @@ function ChatApp() {
 
   React.useEffect(() => {
     if (!currentUser?.id) return;
-    const socket = io(CHAT_BASE_URL, { transports: ['websocket'] });
+    const socket = io(CHAT_BASE_URL, { transports: ['websocket'], path: SOCKET_IO_PATH });
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -170,9 +176,15 @@ ReactDOM.createRoot(document.getElementById('root')).render(<ChatApp />);
 import io from 'socket.io-client';
 
 const CHAT_BASE_URL = window.CHAT_BASE_URL || 'http://localhost:3002';
+let SOCKET_IO_PATH = '/socket.io';
+try {
+  const u = new URL(CHAT_BASE_URL);
+  const basePath = (u.pathname || '').replace(/\/+$/, '');
+  SOCKET_IO_PATH = basePath ? `${basePath}/socket.io` : '/socket.io';
+} catch {}
 
 export function initPresenceForChatApp(currentUserId, onListUpdate) {
-  const socket = io(CHAT_BASE_URL, { transports: ['websocket'], reconnection: true });
+  const socket = io(CHAT_BASE_URL, { transports: ['websocket'], reconnection: true, path: SOCKET_IO_PATH });
   socket.on('connect', () => {
     console.log('[presence][chat_app] connected', socket.id);
     socket.emit('auth', { user_id: currentUserId });

@@ -9,7 +9,7 @@ if (app.isPackaged) {
 }
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
+const { exec, fork } = require('child_process');
 const log = require('electron-log');
 const { Op } = require('sequelize');
 const os = require('os');
@@ -34,6 +34,52 @@ const recoveryService = require(path.join(appRoot, 'src', 'services', 'recovery_
 // Keep a global reference of the window object to avoid garbage collection
 let mainWindow;
 let chatOverlayWindow = null;
+let chatServerProcess = null;
+
+// Chat server autostart helpers
+const CHAT_HOST = (process.env.CHAT_HOST || 'localhost').trim();
+const CHAT_PORT = parseInt(process.env.CHAT_PORT || '3002', 10);
+async function isPortOpen(port) {
+  return new Promise((resolve) => {
+    try {
+      const sock = require('net').createConnection({ port, host: '127.0.0.1' }, () => {
+        try { sock.end(); } catch {}
+        resolve(true);
+      });
+      sock.on('error', () => resolve(false));
+      setTimeout(() => { try { sock.destroy(); } catch {}; resolve(false); }, 800);
+    } catch (e) { resolve(false); }
+  });
+}
+async function startChatServerIfNeeded() {
+  try {
+    // Only autostart when host is local
+    if (!['localhost', '127.0.0.1'].includes(String(CHAT_HOST).toLowerCase())) {
+      log.info(`Skip autostart: CHAT_HOST=${CHAT_HOST} not local`);
+      return;
+    }
+    const open = await isPortOpen(CHAT_PORT);
+    if (open) { log.info(`Chat server already running on port ${CHAT_PORT}`); return; }
+    const serverPath = path.join(appRoot, 'server.js');
+    log.info(`Starting chat server: ${serverPath} port=${CHAT_PORT}`);
+    chatServerProcess = fork(serverPath, [], { env: { ...process.env, CHAT_PORT: String(CHAT_PORT) } });
+    if (chatServerProcess?.stdout) {
+      chatServerProcess.stdout.on('data', (d) => { try { log.info(`[chat] ${d.toString().trim()}`); } catch {} });
+    }
+    if (chatServerProcess?.stderr) {
+      chatServerProcess.stderr.on('data', (d) => { try { log.error(`[chat] ${d.toString().trim()}`); } catch {} });
+    }
+    chatServerProcess.on('exit', (code) => { log.warn(`Chat server exited code=${code}`); chatServerProcess = null; });
+  } catch (e) { log.error('Failed to start chat server', e); }
+}
+async function stopChatServer() {
+  try {
+    if (!chatServerProcess) return;
+    log.info('Stopping chat server...');
+    try { chatServerProcess.kill('SIGTERM'); } catch {}
+    setTimeout(() => { if (chatServerProcess) { try { chatServerProcess.kill('SIGKILL'); } catch {} } }, 1000);
+  } catch (e) { log.error('Failed to stop chat server', e); }
+}
 
 // Create the main application window
 function createWindow() {
@@ -107,6 +153,10 @@ app.whenReady().then(async () => {
     await autoRestartService.startMonitoring();
     log.info('Auto-restart monitoring service started');
 
+    // Ensure chat server is running (autostart in packaged builds)
+    await startChatServerIfNeeded();
+    log.info('Chat server ensured running');
+
     createWindow();
   } catch (error) {
     log.error('Failed to connect to database:', error);
@@ -131,6 +181,10 @@ app.on('before-quit', async () => {
     
     // Log that the application is closing but don't change session status
     log.info('Application closing - active SIMRS sessions remain active');
+
+    // Stop chat server child process if spawned
+    await stopChatServer();
+    log.info('Chat server stopped');
   } catch (error) {
     log.error('Error during application quit:', error);
   }
@@ -149,6 +203,22 @@ app.on('activate', () => {
   }
 });
 
+// Provide chat base URL to renderer
+ipcMain.handle('chat:get-base-url', async () => {
+  try {
+    const protocol = (process.env.CHAT_PROTOCOL || ((CHAT_PORT === 443 || CHAT_PORT === '443') ? 'https' : 'http'));
+    const basePathEnv = process.env.CHAT_BASE_PATH || '';
+    const basePath = basePathEnv ? (basePathEnv.startsWith('/') ? basePathEnv.replace(/\/+$/, '') : `/${basePathEnv.replace(/\/+$/, '')}`) : '';
+
+    const defaultPort = (protocol === 'https' ? (CHAT_PORT == 443 || CHAT_PORT == '443') : (CHAT_PORT == 80 || CHAT_PORT == '80'));
+    const portSegment = defaultPort ? '' : `:${CHAT_PORT}`;
+
+    return `${protocol}://${CHAT_HOST}${portSegment}${basePath}`;
+  } catch {
+    return 'http://localhost:3002';
+  }
+});
+
 // Chat overlay IPC handlers
 function createChatOverlay(data) {
   try {
@@ -159,8 +229,8 @@ function createChatOverlay(data) {
     const preloadPath = path.join(appRoot, 'preload.js');
     const overlayHtmlPath = path.join(appRoot, 'src', 'views', 'chat_notify.html');
     chatOverlayWindow = new BrowserWindow({
-      width: 360,
-      height: 180,
+      width: 560,
+      height: 300,
       frame: false,
       transparent: true,
       alwaysOnTop: true,

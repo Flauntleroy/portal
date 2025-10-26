@@ -435,6 +435,12 @@ body {
   border-color: var(--teal);
 }
 .chat-mini-send:hover, .chat-mini-send:focus {
-  background-color: var(--teal-dark);
-  border-color: var(--teal-dark);
-}
+   background-color: var(--teal-dark);
+   border-color: var(--teal-dark);
+ }
+
+ /* Message status ticks */
+ .msg-status { color: #6b7280; }
+ .tick { font-weight: 700; }
+ .tick.double { letter-spacing: -2px; }
+ .tick.double.read { color: #0ea5e9; }

@@ -35,4 +35,7 @@ contextBridge.exposeInMainWorld('api', {
   onChatOverlayMessage: (handler) => ipcRenderer.on('chat:overlay-message', (_, data) => { try { if (typeof handler === 'function') handler(data); } catch (e) {} }),
   openChatFromOverlay: (payload) => ipcRenderer.send('chat:open-modal', payload),
   closeChatOverlay: () => ipcRenderer.send('chat:overlay-close'),
+
+  // Chat config
+  getChatBaseUrl: () => ipcRenderer.invoke('chat:get-base-url'),
 });
