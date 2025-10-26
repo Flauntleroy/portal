@@ -36,27 +36,44 @@
     "directories": {
       "output": "dist"
     },
+    "files": [
+      "main.js",
+      "preload.js",
+      "server.js",
+      "src/**",
+      "!**/*.map",
+      "!**/*.md",
+      "!**/*.sql",
+      "!scripts/**",
+      "!tests/**",
+      "!dist/**",
+      "!out/**",
+      "!build/**",
+      "!electron-cache/**",
+      "!uploads/**"
+    ],
     "win": {
       "target": [
-        {
-          "target": "portable",
-          "arch": ["x64"]
-        }
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
       ],
-      "icon": "uploads/Icon-IT.ico",      
+      "icon": "uploads/Icon-IT.ico",
       "requestedExecutionLevel": "asInvoker"
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
+    "nsis": {
+      "artifactName": "${productName}-${version}-setup.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "extraMetadata": {
       "main": "main.js"
     },
-    "files": [
-      "**/*"
-    ],
-    "asar": false,
-    "compression": "normal",
+    "asar": true,
+    "compression": "maximum",
     "nodeGypRebuild": false,
     "buildDependenciesFromSource": false,
     "forceCodeSigning": false,

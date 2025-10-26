@@ -459,6 +459,7 @@ function createChatModal(peer) {
     peer,
     roomId: null,
     listEl: el.querySelector('.chat-mini-messages'),
+    scrollEl: el.querySelector('.modal-body'),
     inputEl: el.querySelector('.chat-mini-input'),
     sendBtn: el.querySelector('.chat-mini-send')
   };
@@ -481,11 +482,35 @@ function renderMessageBubble(m, meId) {
     const meta = document.createElement('div');
     meta.style.fontSize = '11px';
     meta.style.textAlign = 'right';
+    meta.style.marginTop = '4px';
+    meta.style.color = '#6b7280';
+    
     const statusSpan = document.createElement('span');
     statusSpan.className = 'msg-status';
-    const hasRead = !!(m.reads && m.reads.length) || !!m.read_count || !!m.read_at;
-    // Ubah indikator: tampilkan teks 'Dibaca' atau 'Belum dibaca'
-    statusSpan.textContent = hasRead ? 'Dibaca' : 'Belum dibaca';
+    
+    // Debug: log data untuk melihat apa yang diterima
+    console.log('Message data:', m);
+    console.log('Read count:', m.read_count);
+    console.log('Reads array:', m.reads);
+    console.log('Is read by me:', m.is_read_by_me);
+    
+    // Cek apakah pesan sudah dibaca oleh penerima (bukan saya)
+    const hasRead = Array.isArray(m.reads)
+      ? m.reads.some(r => String(r.user_id) !== String(meId))
+      : (m.read_count && m.read_count > 0);
+    
+    if (hasRead) {
+      // Tampilkan double tick biru untuk sudah dibaca
+      statusSpan.innerHTML = '✓✓';
+      statusSpan.style.color = '#0ea5e9';
+      statusSpan.title = 'Sudah dibaca';
+    } else {
+      // Tampilkan single tick abu-abu untuk terkirim tapi belum dibaca
+      statusSpan.innerHTML = '✓';
+      statusSpan.style.color = '#6b7280';
+      statusSpan.title = 'Terkirim';
+    }
+    
     meta.appendChild(statusSpan);
     div.appendChild(meta);
   }
@@ -494,19 +519,67 @@ function renderMessageBubble(m, meId) {
 
 async function loadMessagesIntoHandle(handle, rid) {
   try {
-    const r = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}`);
+    const meId = getCurrentUserId();
+    const r = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}&user_id=${meId}`);
     const data = await r.json();
     handle.listEl.innerHTML = '';
-    const meId = getCurrentUserId();
     data.forEach(m => { handle.listEl.appendChild(renderMessageBubble(m, meId)); });
-    handle.listEl.scrollTop = handle.listEl.scrollHeight;
+    if (handle.scrollEl) {
+      handle.scrollEl.scrollTop = handle.scrollEl.scrollHeight;
+    } else {
+      handle.listEl.scrollTop = handle.listEl.scrollHeight;
+    }
+    
+    // Mark messages as read when loading
+    const unreadMessages = data.filter(m => String(m.sender_id) !== String(meId) && !m.is_read_by_me);
+    for (const msg of unreadMessages) {
+      try {
+        await fetch(`${CHAT_BASE_URL}/api/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: meId, message_id: msg.id })
+        });
+      } catch (e) { console.warn('mark read error', e); }
+    }
+    
+    // Reload messages after marking as read to update read status display
+    if (unreadMessages.length > 0) {
+      setTimeout(async () => {
+        try {
+          const r2 = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}&user_id=${meId}`);
+          const updatedData = await r2.json();
+          handle.listEl.innerHTML = '';
+          updatedData.forEach(m => { handle.listEl.appendChild(renderMessageBubble(m, meId)); });
+          if (handle.scrollEl) {
+            handle.scrollEl.scrollTop = handle.scrollEl.scrollHeight;
+          } else {
+            handle.listEl.scrollTop = handle.listEl.scrollHeight;
+          }
+        } catch (e) { console.warn('reload messages error', e); }
+      }, 500);
+    }
   } catch (e) { console.warn('loadMessagesIntoHandle error', e); }
 }
 
 function appendMessageToHandle(handle, m) {
   const meId = getCurrentUserId();
   handle.listEl.appendChild(renderMessageBubble(m, meId));
-  handle.listEl.scrollTop = handle.listEl.scrollHeight;
+  if (handle.scrollEl) {
+    handle.scrollEl.scrollTop = handle.scrollEl.scrollHeight;
+  } else {
+    handle.listEl.scrollTop = handle.listEl.scrollHeight;
+  }
+  
+  // Mark new incoming message as read if it's not from me
+  if (String(m.sender_id) !== String(meId)) {
+    try {
+      fetch(`${CHAT_BASE_URL}/api/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: meId, message_id: m.id })
+      }).catch(e => console.warn('mark read error', e));
+    } catch (e) { console.warn('mark read error', e); }
+  }
 }
 
 async function sendMessageFromHandle(handle) {
@@ -528,6 +601,24 @@ async function sendMessageFromHandle(handle) {
       if (window._chatSocket) window._chatSocket.emit('room:join', { room_id: handle.roomId });
     }
     handle.inputEl.value = '';
+    
+    // Reload messages after sending to update read status for all messages
+    setTimeout(async () => {
+      try {
+        const rid = handle.roomId;
+        if (rid) {
+          const r2 = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}&user_id=${meId}`);
+          const updatedData = await r2.json();
+          handle.listEl.innerHTML = '';
+          updatedData.forEach(m => { handle.listEl.appendChild(renderMessageBubble(m, meId)); });
+          if (handle.scrollEl) {
+            handle.scrollEl.scrollTop = handle.scrollEl.scrollHeight;
+          } else {
+            handle.listEl.scrollTop = handle.listEl.scrollHeight;
+          }
+        }
+      } catch (e) { console.warn('reload messages after send error', e); }
+    }, 300);
   } catch (e) { console.warn('sendMessage error', e); }
 }
 
@@ -547,6 +638,18 @@ function openChatPopup(peer) {
   } catch (e) {}
 
   handle.modal.show();
+  
+  // Auto scroll ke bawah setelah modal ditampilkan
+  handle.el.addEventListener('shown.bs.modal', () => {
+    setTimeout(() => {
+      if (handle.scrollEl) {
+        handle.scrollEl.scrollTop = handle.scrollEl.scrollHeight;
+      } else if (handle.listEl) {
+        handle.listEl.scrollTop = handle.listEl.scrollHeight;
+      }
+    }, 100);
+  }, { once: true });
+  
   fetch(`${CHAT_BASE_URL}/api/direct-room?user_id=${meId}&peer_id=${peer.id}`)
     .then(r => r.json())
     .then(room => {
@@ -625,6 +728,23 @@ async function initChatPresence(userId) {
         }
       } catch (e) { console.warn('chat:new_message handler error', e); }
     });
+
+    // Perbarui status read secara real-time
+    socket.on('chat:message_read', async (payload) => {
+      try {
+        const { room_id } = payload || {};
+        const handle = chatPopupsByRoomId[room_id];
+        if (handle) {
+          window._readReloadCooldown = window._readReloadCooldown || {};
+          if (!window._readReloadCooldown[room_id]) {
+            window._readReloadCooldown[room_id] = true;
+            await loadMessagesIntoHandle(handle, room_id);
+            setTimeout(() => { window._readReloadCooldown[room_id] = false; }, 800);
+          }
+        }
+      } catch (e) { console.warn('chat:message_read handler error', e); }
+    });
+
     socket._chatMessageHandlerInstalled = true;
   }
 

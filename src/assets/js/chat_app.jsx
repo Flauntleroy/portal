@@ -92,9 +92,21 @@ function ChatApp() {
   }
 
   async function loadMessages(rid) {
-    const r = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}`);
+    const r = await fetch(`${CHAT_BASE_URL}/api/messages?room_id=${rid}&user_id=${currentUser.id}`);
     const data = await r.json();
     setMessages(data);
+    
+    // Mark messages as read when loading
+    const unreadMessages = data.filter(m => String(m.sender_id) !== String(currentUser.id) && !m.is_read_by_me);
+    for (const msg of unreadMessages) {
+      try {
+        await fetch(`${CHAT_BASE_URL}/api/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: currentUser.id, message_id: msg.id })
+        });
+      } catch (e) { console.warn('mark read error', e); }
+    }
   }
 
   async function sendMessage() {
@@ -167,6 +179,15 @@ function ChatApp() {
               <div style={{fontSize:'12px'}} className="text-muted">{m.sender_id===currentUser.id ? 'Anda' : (m.sender || 'Teman')}</div>
               <div>{m.message}</div>
               <div style={{fontSize:'11px'}} className="text-muted">{new Date(m.created_at).toLocaleString()}</div>
+              {m.sender_id === currentUser.id && (
+                <div style={{fontSize:'11px', textAlign:'right', marginTop:'4px', color:'#6b7280'}}>
+                  {m.read_count > 0 || (m.reads && m.reads.length > 0) ? (
+                    <span style={{color:'#0ea5e9'}}>✓✓</span>
+                  ) : (
+                    <span>✓</span>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>

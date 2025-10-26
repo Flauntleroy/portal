@@ -143,12 +143,18 @@ app.get('/api/rooms', async (req, res) => {
 app.get('/api/messages', async (req, res) => {
   try {
     const roomId = parseInt(req.query.room_id, 10);
+    const userId = parseInt(req.query.user_id, 10);
     if (!roomId) return res.status(400).json({ error: 'room_id diperlukan' });
+    
     const messages = await db.ChatMessage.findAll({
       where: { room_id: roomId },
-      include: [{ model: db.User, as: 'Sender', attributes: ['id', 'username', 'full_name'] }],
+      include: [
+        { model: db.User, as: 'Sender', attributes: ['id', 'username', 'full_name'] },
+        { model: db.ChatMessageRead, as: 'Reads', attributes: ['user_id', 'read_at'] }
+      ],
       order: [['created_at', 'ASC']]
     });
+    
     res.json(messages.map(m => ({
       id: m.id,
       room_id: m.room_id,
@@ -156,7 +162,10 @@ app.get('/api/messages', async (req, res) => {
       sender: m.Sender?.full_name || m.Sender?.username,
       message: m.message,
       message_type: m.message_type,
-      created_at: m.created_at
+      created_at: m.created_at,
+      reads: m.Reads || [],
+      read_count: m.Reads ? m.Reads.length : 0,
+      is_read_by_me: userId ? m.Reads?.some(r => r.user_id === userId) : false
     })));
   } catch (e) {
     log.error('messages error', e);
@@ -222,6 +231,19 @@ app.post('/api/read', async (req, res) => {
       where: { message_id, user_id },
       defaults: { read_at: new Date() }
     });
+    // Emit ke semua peserta room bahwa pesan ini telah dibaca
+    try {
+      const msg = await db.ChatMessage.findOne({ where: { id: message_id } });
+      if (msg && msg.room_id) {
+        io.to(`room:${msg.room_id}`).emit('chat:message_read', {
+          message_id,
+          room_id: msg.room_id,
+          reader_id: parseInt(user_id, 10)
+        });
+      }
+    } catch (emitErr) {
+      log.warn('emit chat:message_read error', emitErr);
+    }
     res.json({ success: true });
   } catch (e) {
     log.error('read error', e);
