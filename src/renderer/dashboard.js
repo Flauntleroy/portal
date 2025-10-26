@@ -410,6 +410,17 @@ function resolveUserById(userId) {
     .catch(() => null);
 }
 
+// Helper: bangun URL foto dari berbagai format yang mungkin
+function buildPhotoUrl(photo) {
+  try {
+    if (!photo) return null;
+    if (typeof photo !== 'string') return null;
+    if (photo.startsWith('http')) return photo;
+    if (photo.startsWith('../')) return photo;
+    return `https://portal.rsudhabdulazizmarabahan.com/uploads/photos/${photo}`;
+  } catch { return null; }
+}
+
 function createChatModal(peer) {
   const mid = `chatModal-${peer.id}`;
   let el = document.getElementById(mid);
@@ -445,6 +456,31 @@ function createChatModal(peer) {
       </div>
     `;
     document.body.appendChild(el);
+    // Tambahkan avatar di header (gantikan ikon user)
+    try {
+      const avatarUrl = buildPhotoUrl(peer.photo);
+      const headerLeft = el.querySelector('.modal-header .d-flex align-items-center');
+      if (headerLeft) {
+        const img = document.createElement('img');
+        img.className = 'rounded-circle me-2 chat-header-avatar';
+        img.style.width = '28px';
+        img.style.height = '28px';
+        img.style.objectFit = 'cover';
+        img.alt = 'avatar';
+        if (avatarUrl) img.src = avatarUrl;
+        img.onerror = () => {
+          try {
+            if (peer.photo && avatarUrl && avatarUrl.includes('portal.rsudhabdulazizmarabahan.com')) {
+              img.src = `../assets/uploads/${peer.photo}`;
+            } else {
+              img.remove();
+            }
+          } catch { img.remove(); }
+        };
+        const icon = headerLeft.querySelector('.fas.fa-user');
+        if (icon) icon.replaceWith(img); else headerLeft.insertBefore(img, headerLeft.firstChild);
+      }
+    } catch (e) { console.warn('inject header avatar error', e); }
     // Animasi show/hide yang smooth
     el.addEventListener('shown.bs.modal', () => { try { el.querySelector('.chat-modal-anim')?.classList.add('showing'); } catch(e){} });
     el.addEventListener('hide.bs.modal', () => { try { el.querySelector('.chat-modal-anim')?.classList.remove('showing'); } catch(e){} });
@@ -876,6 +912,31 @@ function renderOnlineUsers(list) {
           <button class="btn btn-sm btn-outline-primary chat-start-btn" title="Chat" data-user-id="${u.id}"><i class="fas fa-paper-plane"></i></button>
         </div>
       `;
+      // Sisipkan avatar ke sisi kiri
+      try {
+        const left = item.querySelector('.d-flex.align-items-center.gap-2');
+        const avatarUrl = buildPhotoUrl(u.photo);
+        if (left) {
+          const img = document.createElement('img');
+          img.className = 'rounded-circle border';
+          img.style.width = '28px';
+          img.style.height = '28px';
+          img.style.objectFit = 'cover';
+          img.alt = 'avatar';
+          if (avatarUrl) img.src = avatarUrl;
+          img.onerror = () => {
+            try {
+              if (u.photo && avatarUrl && avatarUrl.includes('portal.rsudhabdulazizmarabahan.com')) {
+                img.src = `../assets/uploads/${u.photo}`;
+              } else {
+                img.remove();
+              }
+            } catch { img.remove(); }
+          };
+          left.insertBefore(img, left.firstChild);
+        }
+      } catch (e) { console.warn('inject list avatar error', e); }
+
       container.appendChild(item);
       const btn = item.querySelector('.chat-start-btn');
       if (btn) btn.addEventListener('click', () => startChatWithUser(u));
@@ -911,6 +972,11 @@ try {
       const user = JSON.parse(localStorage.getItem('currentUser') || 'null');
       // Pastikan tombol Chat bisa toggle offcanvas
       setupChatToggle();
+      // Ikat pencarian user online
+      const inp = document.getElementById('online-users-search');
+      if (inp) {
+        inp.addEventListener('input', (e) => filterOnlineUsersByQuery(e.target.value));
+      }
       if (user && user.id) await setupChatPresence(user);
     } catch (e) { console.warn('[presence] init on load error', e); }
   });

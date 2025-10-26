@@ -82,12 +82,14 @@ app.get('/api/contacts', async (req, res) => {
     const online = await db.OnlineUser.findAll({ where: { status: 'online' } });
     const onlineSet = new Set(online.map(o => o.user_id));
 
+
     res.json(contacts.map(u => ({
       id: u.id,
       username: u.username,
       full_name: u.full_name,
       unit_kerja: u.UnitKerja ? u.UnitKerja.nama : null,
-      online: onlineSet.has(u.id)
+      online: onlineSet.has(u.id),
+      photo: u.photo
     })));
   } catch (e) {
     log.error('contacts error', e);
@@ -113,7 +115,8 @@ app.get('/api/online-users', async (req, res) => {
           username: r.User?.username,
           full_name: r.User?.full_name,
           unit_kerja: r.User?.UnitKerja ? r.User.UnitKerja.nama : null,
-          last_active: r.last_active
+          last_active: r.last_active,
+          photo: r.User?.photo
         });
       }
     }
