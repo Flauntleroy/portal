@@ -429,7 +429,6 @@ function createChatModal(peer) {
               </div>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <button type="button" class="btn btn-light btn-sm btn-minimize" aria-label="Minimalkan"><i class="fas fa-minus"></i></button>
               <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
           </div>
