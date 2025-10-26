@@ -459,7 +459,7 @@ function createChatModal(peer) {
     // Tambahkan avatar di header (gantikan ikon user)
     try {
       const avatarUrl = buildPhotoUrl(peer.photo);
-      const headerLeft = el.querySelector('.modal-header .d-flex align-items-center');
+      const headerLeft = el.querySelector('.modal-header .d-flex.align-items-center');
       if (headerLeft) {
         const img = document.createElement('img');
         img.className = 'rounded-circle me-2 chat-header-avatar';
@@ -752,6 +752,7 @@ async function initChatPresence(userId) {
               sender_id: m.sender_id,
               sender_name: peer.full_name || peer.username || 'Pengguna',
               unit_kerja: peer.unit_kerja || null,
+              photo: peer.photo || null,
               room_id: m.room_id,
               message: m.message,
               unread_count: unreadCount

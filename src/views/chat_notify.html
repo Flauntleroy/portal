@@ -88,7 +88,7 @@
     .avatar { 
       width: 44px; 
       height: 44px; 
-      border-radius: 12px; 
+      border-radius: 50%;
       background: linear-gradient(135deg, var(--accent) 0%, #059669 100%);
       display: grid; 
       place-items: center; 
@@ -98,6 +98,14 @@
       flex-shrink: 0;
       box-shadow: 0 4px 12px var(--accent-glow);
       letter-spacing: 0.5px;
+    }
+    .avatar-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px var(--accent-glow);
     }
     
     .sender-info { 
@@ -386,6 +394,7 @@
     <div class="header">
       <div class="name">
         <div id="avatar" class="avatar" aria-hidden="true">A</div>
+        <img id="avatarImg" class="avatar-img" alt="avatar" style="display:none" />
         <div class="sender-info">
           <div id="unitBadge" class="unit-badge" style="display:none">Unit</div>
           <span id="senderName" class="sender-name" title="Pengirim">Pengguna</span>
@@ -438,10 +447,20 @@
           o.start(); o.stop(ctx.currentTime + 0.3);
         } catch(e){}
       }
+      function buildPhotoUrl(photo){
+        try {
+          if (!photo || typeof photo !== 'string') return null;
+          if (photo.startsWith('http')) return photo;
+          if (photo.startsWith('../')) return photo;
+          return `https://portal.rsudhabdulazizmarabahan.com/uploads/photos/${photo}`;
+        } catch { return null; }
+      }
+
       function setData(d){
         payload = d || {};
         const name = d.sender_name || d.sender || 'Pengguna';
         const unit = d.unit_kerja || d.sender_unit || null;
+        const photo = d.photo || null;
         
         const sn = document.getElementById('senderName');
         if (sn) { sn.textContent = name; try { sn.setAttribute('title', name); } catch(e){} }
@@ -466,7 +485,27 @@
           badgeEl.style.display = bc > 0 ? 'inline-block' : 'none';
         }
         const av = document.getElementById('avatar');
+        const avImg = document.getElementById('avatarImg');
         if (av) { av.textContent = (name || '?').trim().charAt(0).toUpperCase(); }
+        if (avImg && photo) {
+          const url = buildPhotoUrl(photo);
+          if (url) {
+            avImg.src = url;
+            avImg.onload = () => { try { av.style.display = 'none'; avImg.style.display = 'block'; } catch(e){} };
+            avImg.onerror = () => {
+              try {
+                if (photo && url.includes('portal.rsudhabdulazizmarabahan.com')) {
+                  avImg.src = `../assets/uploads/${photo}`;
+                } else {
+                  avImg.style.display = 'none'; av.style.display = 'grid';
+                }
+              } catch { avImg.style.display = 'none'; av.style.display = 'grid'; }
+            };
+          }
+        } else {
+          if (avImg) avImg.style.display = 'none';
+          if (av) av.style.display = 'grid';
+        }
         playSound();
         const input = document.getElementById('replyInput');
         try { input.focus(); input.select(); } catch(e){}
