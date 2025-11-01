@@ -180,6 +180,63 @@
             </div>
         </div>
 
+        <!-- Diagnostik -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card settings-card">
+                    <div class="card-header settings-header">
+                        <h5 class="mb-0"><i class="bi bi-bug"></i> Diagnostik Auto-Restart</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Last Check:</span>
+                                    <span id="diag-last-check" class="text-muted">—</span>
+                                </div>
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Next Check:</span>
+                                    <span id="diag-next-check" class="text-muted">—</span>
+                                </div>
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Countdown (detik):</span>
+                                    <span id="diag-countdown" class="text-muted">0</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Shift Saat Ini:</span>
+                                    <span id="diag-current-shift" class="text-muted">—</span>
+                                </div>
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>End Time:</span>
+                                    <span id="diag-shift-end" class="text-muted">—</span>
+                                </div>
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Sisa Waktu:</span>
+                                    <span id="diag-time-until-end" class="text-muted">—</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Early Warning:</span>
+                                    <span id="diag-flag-early" class="badge bg-secondary">false</span>
+                                </div>
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Final Warning:</span>
+                                    <span id="diag-flag-final" class="badge bg-secondary">false</span>
+                                </div>
+                                <div class="mb-2 d-flex justify-content-between">
+                                    <span>Warning Window:</span>
+                                    <span id="diag-warning-open" class="badge bg-secondary">closed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Konfigurasi -->
         <div class="row">
             <div class="col-md-8">
@@ -327,9 +384,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadConfig();
             loadStatus();
+            loadDiagnostics();
             
             // Update status every 5 seconds
             setInterval(loadStatus, 5000);
+            setInterval(loadDiagnostics, 5000);
         });
     </script>
 </body>

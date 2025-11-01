@@ -29,6 +29,25 @@ contextBridge.exposeInMainWorld('api', {
   manualShiftChange: (payload) => ipcRenderer.invoke('manual-shift-change', payload),
   updateUnitShiftConfig: (config) => ipcRenderer.invoke('update-unit-shift-config', config),
 
+  // Auto-restart APIs
+  getAutoRestartConfig: () => ipcRenderer.invoke('auto-restart:get-config'),
+  setAutoRestartConfig: (config) => ipcRenderer.invoke('auto-restart:set-config', config),
+  getAutoRestartStatus: () => ipcRenderer.invoke('auto-restart:get-status'),
+  getAutoRestartDiagnostics: () => ipcRenderer.invoke('auto-restart:get-diagnostics'),
+  startAutoRestartMonitoring: () => ipcRenderer.invoke('auto-restart:start-monitoring'),
+  stopAutoRestartMonitoring: () => ipcRenderer.invoke('auto-restart:stop-monitoring'),
+  postponeRestart: (minutes) => ipcRenderer.invoke('auto-restart:postpone-restart', minutes),
+  cancelRestart: () => ipcRenderer.invoke('auto-restart:cancel-restart'),
+  forceRestart: () => ipcRenderer.invoke('auto-restart:force-restart'),
+
+  // Recovery & backups
+  getAvailableBackups: () => ipcRenderer.invoke('recovery:get-available-backups'),
+  manualRecovery: (backupFile) => ipcRenderer.invoke('recovery:manual-recovery', backupFile),
+  cleanupOldBackups: () => ipcRenderer.invoke('recovery:cleanup-old-backups'),
+
+  // Shifts list (for settings page)
+  getAllShifts: () => ipcRenderer.invoke('get-all-shifts'),
+
   // Chat overlay notifications
   notifyChat: (payload) => ipcRenderer.send('chat:notify', payload),
   onChatOpenModal: (handler) => ipcRenderer.on('chat:open-modal', (_, data) => { try { if (typeof handler === 'function') handler(data); } catch (e) {} }),

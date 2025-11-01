@@ -92,11 +92,11 @@
       <div class="panel">
         <div class="header">
           <div class="icon">⚠️</div>
-          <div class="title">Aplikasi Akan Restart</div>
+          <div class="title">SIMRS Akan Restart</div>
         </div>
-        <div class="message">Shift kerja akan berakhir dan aplikasi perlu direstart untuk pergantian shift.</div>
-        <div class="countdown" id="countdown">06:30</div>
-        <div class="hint">Pastikan semua pekerjaan telah disimpan.</div>
+        <div class="message">Portal SIMRS akan restart dalam <span id="warnText"></span>. Pastikan semua data SIMRS sudah disimpan.</div>
+        <div class="countdown" id="countdown">--:--</div>
+        <div class="hint">Pastikan inputan SIMRS sudah disimpan.</div>
         <div class="actions">
           <button id="okButton" onclick="handleOkClick()" disabled>OK</button>
         </div>
@@ -106,16 +106,27 @@
   </div>
 
   <script>
-    // Preview awal pada fase 6:30, bisa ganti ke 30 untuk fase kedua
+    // Preview: ubah countdownSeconds untuk simulasi
     let countdownSeconds = 390; // 6 menit 30 detik
     let buttonCountdown = 3;
+
+    function formatWarnText() {
+      const m = Math.floor(countdownSeconds / 60);
+      const s = countdownSeconds % 60;
+      if (m > 0 && s >= 30) return m + ' menit';
+      if (m > 0 && s < 30) return m + ' menit kurang';
+      if (m === 0 && s > 30) return 'kurang dari 1 menit';
+      if (m === 0 && s > 0) return s + ' detik';
+      return 'segera';
+    }
 
     function updateCountdown() {
       const minutes = Math.floor(countdownSeconds / 60);
       const seconds = countdownSeconds % 60;
       document.getElementById('countdown').textContent =
         minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
-
+      const wt = document.getElementById('warnText');
+      if (wt) wt.textContent = formatWarnText();
       if (countdownSeconds > 0) {
         countdownSeconds--;
       } else {
@@ -138,7 +149,6 @@
     }
 
     function handleOkClick() {
-      // Tutup overlay saja untuk preview
       document.querySelector('.modal-overlay').style.display = 'none';
     }
 

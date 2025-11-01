@@ -2,6 +2,57 @@
 
 let currentConfig = {};
 let statusUpdateInterval = null;
+let diagnosticsUpdateInterval = null;
+
+// Preview stub: when running outside Electron, provide window.api mocks
+if (typeof window !== 'undefined' && typeof window.api === 'undefined') {
+    window.api = {
+        getAutoRestartConfig: async () => ({
+            enableAutoRestart: true,
+            warningMinutes: 5,
+            checkIntervalSeconds: 30,
+            gracePeriodMinutes: 2,
+            maxPostponeMinutes: 30,
+            backupRetentionDays: 7,
+            notifications: { showWarningDialog: true, allowPostpone: true, countdownDisplay: true }
+        }),
+        getAutoRestartStatus: async () => ({
+            isMonitoring: true,
+            pendingRestart: false,
+            countdownSeconds: 0,
+            config: {}
+        }),
+        startAutoRestartMonitoring: async () => {},
+        stopAutoRestartMonitoring: async () => {},
+        postponeRestart: async () => {},
+        cancelRestart: async () => {},
+        forceRestart: async () => {},
+        getAvailableBackups: async () => ([
+            { timestamp: Date.now(), sessionCount: 3, currentShift: 'pagi', reason: 'auto-restart', file: 'app-state-123.json' }
+        ]),
+        manualRecovery: async () => {},
+        cleanupOldBackups: async () => {},
+        getAllShifts: async () => ([
+            { shift_name: 'pagi', start_time: '08:00', end_time: '16:30' },
+            { shift_name: 'malam', start_time: '00:00', end_time: '08:00', is_overnight: false }
+        ]),
+        getAutoRestartDiagnostics: async () => ({
+            isMonitoring: true,
+            lastCheck: new Date().toISOString(),
+            nextCheck: new Date(Date.now() + 5000).toISOString(),
+            pendingRestart: false,
+            countdownSeconds: 390,
+            currentShift: 'pagi',
+            shiftEndTime: new Date(Date.now() + 390000).toISOString(),
+            timeUntilEnd: { minutes: 6, seconds: 30 },
+            shownEarlyWarning: true,
+            shownFinalWarning: false,
+            warningWindowOpen: false,
+            timers: { monitoringInterval: true, warningTimer: false, countdownTimer: true }
+        })
+    };
+    console.log('Preview mode: window.api stubbed for static preview.');
+}
 
 /**
  * Load konfigurasi auto-restart
@@ -70,6 +121,30 @@ async function loadStatus() {
     }
 }
 
+/**
+ * Load diagnostics
+ */
+async function loadDiagnostics() {
+    try {
+        const diag = await window.api.getAutoRestartDiagnostics();
+        const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '—'; };
+        setText('diag-last-check', diag.lastCheck || '—');
+        setText('diag-next-check', diag.nextCheck || '—');
+        setText('diag-countdown', (diag.countdownSeconds ?? 0).toString());
+        setText('diag-current-shift', diag.currentShift || '—');
+        setText('diag-shift-end', diag.shiftEndTime || '—');
+        const tu = diag.timeUntilEnd ? `${diag.timeUntilEnd.minutes}m ${diag.timeUntilEnd.seconds}s` : '—';
+        setText('diag-time-until-end', tu);
+        const earlyEl = document.getElementById('diag-flag-early');
+        const finalEl = document.getElementById('diag-flag-final');
+        const warnEl = document.getElementById('diag-warning-open');
+        if (earlyEl) { earlyEl.textContent = diag.shownEarlyWarning ? 'true' : 'false'; earlyEl.className = `badge ${diag.shownEarlyWarning ? 'bg-warning' : 'bg-secondary'}`; }
+        if (finalEl) { finalEl.textContent = diag.shownFinalWarning ? 'true' : 'false'; finalEl.className = `badge ${diag.shownFinalWarning ? 'bg-danger' : 'bg-secondary'}`; }
+        if (warnEl) { warnEl.textContent = diag.warningWindowOpen ? 'open' : 'closed'; warnEl.className = `badge ${diag.warningWindowOpen ? 'bg-info' : 'bg-secondary'}`; }
+    } catch (error) {
+        console.error('Error loading diagnostics:', error);
+    }
+}
 /**
  * Save konfigurasi
  */
@@ -323,6 +398,7 @@ document.getElementById('config-form').addEventListener('submit', function(e) {
 document.addEventListener('DOMContentLoaded', async function() {
     await loadConfig();
     await loadStatus();
+    await loadDiagnostics();
     await loadBackupList();
     await loadShiftTimes();
     
@@ -330,11 +406,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     statusUpdateInterval = setInterval(async () => {
         await loadStatus();
     }, 5000); // Update every 5 seconds
+
+    diagnosticsUpdateInterval = setInterval(async () => {
+        await loadDiagnostics();
+    }, 5000);
 });
 
 // Cleanup interval when page unloads
 window.addEventListener('beforeunload', function() {
     if (statusUpdateInterval) {
         clearInterval(statusUpdateInterval);
+    }
+    if (diagnosticsUpdateInterval) {
+        clearInterval(diagnosticsUpdateInterval);
     }
 });

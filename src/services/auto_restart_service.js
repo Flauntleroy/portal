@@ -2,6 +2,7 @@ const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const log = require('electron-log');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const shiftService = require('./shift_service');
 const { ShiftSchedule, SimrsUsage } = require('../models');
 
@@ -13,13 +14,23 @@ class AutoRestartService {
     this.restartCountdownTimer = null;
     this.warningWindow = null;
     this.config = {
-      warningMinutes: 5, // Peringatan 5 menit sebelum restart
-      checkIntervalSeconds: 30, // Cek setiap 30 detik
+      warningMinutes: 5,
+      checkIntervalSeconds: 30,
       backupPath: path.join(app.getPath('userData'), 'backup'),
       enableAutoRestart: true,
-      gracePeriodMinutes: 1, // Grace period minimum 1 menit
-      restartDelaySeconds: 60 // Restart terjadi 1 menit setelah end_time
+      gracePeriodMinutes: 1,
+      restartDelaySeconds: 60,
+      finalWarningSeconds: 30,
+      maxPostponeMinutes: 15,
+      backupRetentionDays: 7,
+      notifications: {
+        showWarningDialog: true,
+        allowPostpone: false,
+        countdownDisplay: true
+      }
     };
+    // Load konfigurasi dari file JSON jika tersedia
+    this.loadConfig();
     this.pendingRestart = false;
     this.countdownSeconds = 0;
     // New: persist restart state to avoid relaunch loops
@@ -27,8 +38,12 @@ class AutoRestartService {
     this.pendingShiftName = null;
     this.pendingShiftEndTime = null;
     // New: two-phase warning flags
-    this.shownEarlyWarning = false; // ditampilkan pada sisa 6:30
-    this.shownFinalWarning = false; // ditampilkan pada sisa 0:30
+    this.shownEarlyWarning = false; // ditampilkan saat sisa <= warningMinutes
+    this.shownFinalWarning = false; // ditampilkan saat sisa <= 0:30
+    // Diagnostics
+    this.lastCheck = null;
+    this.nextCheck = null;
+    this.currentShift = null;
   }
 
   /**
@@ -101,6 +116,7 @@ class AutoRestartService {
     ipcMain.handle('auto-restart:postpone-restart', (event, minutes) => this.postponeRestart(minutes));
     ipcMain.handle('auto-restart:cancel-restart', () => this.cancelRestart());
     ipcMain.handle('auto-restart:force-restart', () => this.performRestart());
+    ipcMain.handle('auto-restart:get-diagnostics', () => this.getDiagnostics());
   }
 
   /**
@@ -108,7 +124,10 @@ class AutoRestartService {
    */
   async checkShiftEndTime() {
     try {
+      this.lastCheck = new Date();
+      this.nextCheck = new Date(this.lastCheck.getTime() + this.config.checkIntervalSeconds * 1000);
       const currentShift = await shiftService.getCurrentShift();
+      this.currentShift = currentShift || null;
       if (!currentShift) {
         return;
       }
@@ -122,8 +141,8 @@ class AutoRestartService {
 
       log.debug(`Shift ${currentShift.shift_name} berakhir dalam ${minutesUntilEnd} menit (${secondsUntilEnd} detik)`);
 
-      // Reset phase flags saat masih jauh dari threshold
-      if (secondsUntilEnd > 390) {
+      // Reset phase flags saat masih jauh dari threshold (di atas warningMinutes)
+      if (secondsUntilEnd > (this.config.warningMinutes * 60)) {
         this.shownEarlyWarning = false;
         this.shownFinalWarning = false;
       }
@@ -143,8 +162,8 @@ class AutoRestartService {
         return;
       }
 
-      // Fase final: 30 detik tersisa
-      if (secondsUntilEnd <= 30 && !this.shownFinalWarning) {
+      // Fase final: detik tersisa sesuai konfigurasi
+      if (secondsUntilEnd <= (this.config.finalWarningSeconds || 30) && !this.shownFinalWarning) {
         // Jika window sudah ditutup sebelumnya, tampilkan kembali; jika masih terbuka, biarkan
         if (!this.warningWindow || this.warningWindow.isDestroyed()) {
           log.info('Sisa 30 detik, menampilkan peringatan final');
@@ -158,8 +177,8 @@ class AutoRestartService {
         return;
       }
 
-      // Fase awal: 6 menit 30 detik tersisa
-      if (secondsUntilEnd <= 390 && !this.shownEarlyWarning && !this.pendingRestart) {
+      // Fase awal: pada sisa waktu <= warningMinutes
+      if (secondsUntilEnd <= (this.config.warningMinutes * 60) && !this.shownEarlyWarning && !this.pendingRestart) {
         log.info(`Sisa ${minutesUntilEnd} menit (${secondsUntilEnd} detik), menampilkan peringatan awal`);
         this.pendingShiftName = currentShift.shift_name;
         this.pendingShiftEndTime = shiftEndTime;
@@ -229,6 +248,11 @@ class AutoRestartService {
       return;
     }
 
+    // Resolve preload path consistently with main.js
+    const appRoot = fsSync.existsSync(path.join(process.resourcesPath || '', 'app'))
+      ? path.join(process.resourcesPath, 'app')
+      : path.join(__dirname, '..', '..');
+
     this.warningWindow = new BrowserWindow({
       width: 860,
       height: 360,
@@ -238,7 +262,7 @@ class AutoRestartService {
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, '../preload.js')
+        preload: path.join(appRoot, 'preload.js')
       }
     });
 
@@ -340,8 +364,8 @@ class AutoRestartService {
             <div class="icon">⚠️</div>
             <div class="title">SIMRS Akan Restart</div>
           </div>
-          <div class="message">Portal SIMRS akan restart dalam 5 menit. Pastikan semua data SIMRS sudah disimpan.</div>
-          <div class="countdown" id="countdown">05:00</div>
+          <div class="message">Portal SIMRS akan restart dalam <span id="warnText"></span>. Pastikan semua data SIMRS sudah disimpan.</div>
+          <div class="countdown" id="countdown">--:--</div>
           <div class="hint">Pastikan inputan SIMRS sudah disimpan.</div>
           <div class="actions">
             <button id="okButton" onclick="handleOkClick()" disabled>OK</button>
@@ -352,11 +376,22 @@ class AutoRestartService {
       <script>
         let countdownSeconds = ${this.countdownSeconds};
         let buttonCountdown = 3;
+        function formatWarnText() {
+          const m = Math.floor(countdownSeconds / 60);
+          const s = countdownSeconds % 60;
+          if (m > 0 && s >= 30) return m + ' menit';
+          if (m > 0 && s < 30) return m + ' menit kurang';
+          if (m === 0 && s > 30) return 'kurang dari 1 menit';
+          if (m === 0 && s > 0) return s + ' detik';
+          return 'segera';
+        }
         function updateCountdown() {
           const minutes = Math.floor(countdownSeconds / 60);
           const seconds = countdownSeconds % 60;
           document.getElementById('countdown').textContent = 
             minutes.toString().padStart(2, '0') + ':' + seconds.toString().padStart(2, '0');
+          const wt = document.getElementById('warnText');
+          if (wt) wt.textContent = formatWarnText();
           if (countdownSeconds > 0) {
             countdownSeconds--;
           } else {
@@ -478,6 +513,39 @@ class AutoRestartService {
         'Error Restart',
         `Gagal melakukan restart aplikasi: ${error.message}`
       );
+    }
+  }
+
+  /**
+   * Muat konfigurasi dari file JSON dan gabungkan dengan default
+   */
+  loadConfig() {
+    try {
+      const configPath = path.join(app.getAppPath(), 'src', 'config', 'auto_restart_config.json');
+      if (fsSync.existsSync(configPath)) {
+        const raw = fsSync.readFileSync(configPath, 'utf-8');
+        const json = JSON.parse(raw);
+        const ar = json.autoRestart || {};
+        const notif = json.notifications || {};
+        this.config = {
+          ...this.config,
+          enableAutoRestart: ar.enabled ?? this.config.enableAutoRestart,
+          warningMinutes: ar.warningMinutes ?? this.config.warningMinutes,
+          checkIntervalSeconds: ar.checkIntervalSeconds ?? this.config.checkIntervalSeconds,
+          gracePeriodMinutes: ar.gracePeriodMinutes ?? this.config.gracePeriodMinutes,
+          maxPostponeMinutes: ar.maxPostponeMinutes ?? this.config.maxPostponeMinutes,
+          backupRetentionDays: ar.backupRetentionDays ?? this.config.backupRetentionDays,
+          notifications: {
+            ...this.config.notifications,
+            ...notif
+          }
+        };
+        log.info('Konfigurasi auto-restart dimuat dari JSON');
+      } else {
+        log.warn('File konfigurasi auto-restart tidak ditemukan, menggunakan default');
+      }
+    } catch (e) {
+      log.error('Gagal memuat konfigurasi auto-restart:', e);
     }
   }
 
@@ -614,6 +682,37 @@ class AutoRestartService {
       pendingRestart: this.pendingRestart,
       countdownSeconds: this.countdownSeconds,
       config: this.config
+    };
+  }
+
+  /**
+   * Diagnostik detail untuk troubleshooting
+   */
+  getDiagnostics() {
+    const now = new Date();
+    const shift = this.currentShift;
+    const end = shift ? this.calculateShiftEndTime(shift, now) : null;
+    const diffMs = end ? (end.getTime() - now.getTime()) : null;
+    return {
+      isMonitoring: this.isMonitoring,
+      lastCheck: this.lastCheck ? this.lastCheck.toISOString() : null,
+      nextCheck: this.nextCheck ? this.nextCheck.toISOString() : null,
+      pendingRestart: this.pendingRestart,
+      countdownSeconds: this.countdownSeconds,
+      currentShift: shift ? shift.shift_name : null,
+      shiftEndTime: end ? end.toISOString() : null,
+      timeUntilEnd: diffMs !== null ? {
+        minutes: Math.floor(diffMs / 60000),
+        seconds: Math.floor((diffMs % 60000) / 1000)
+      } : null,
+      shownEarlyWarning: this.shownEarlyWarning,
+      shownFinalWarning: this.shownFinalWarning,
+      warningWindowOpen: !!(this.warningWindow && !this.warningWindow.isDestroyed()),
+      timers: {
+        monitoringInterval: !!this.monitoringInterval,
+        warningTimer: !!this.restartWarningTimer,
+        countdownTimer: !!this.restartCountdownTimer
+      }
     };
   }
 }
